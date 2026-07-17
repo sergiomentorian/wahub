@@ -71,3 +71,36 @@ via SQL direto (`WUZAPI_IMPORT_MODE=auto`).
 
 > Status: **funcional** — migração de sessão validada ao vivo entre WAHA, WuzAPI, Evolution Go e Evolution API,
 > sem re-parear o celular.
+
+## Aviso legal (disclaimer)
+
+**Este projeto não é afiliado, associado, autorizado, endossado nem oficialmente conectado ao WhatsApp,
+à Meta Platforms, Inc. ou a qualquer uma de suas subsidiárias ou afiliadas.** "WhatsApp" é marca registrada
+de seus respectivos titulares. As referências a WhatsApp, Meta e a quaisquer APIs, produtos ou serviços de
+terceiros (Evolution API, Evolution Go, WuzAPI, WAHA, UAZAPI etc.) são feitas apenas para fins de
+identificação e interoperabilidade.
+
+Esta ferramenta utiliza **APIs não-oficiais** do WhatsApp. O uso de clientes/automções não-oficiais **pode
+violar os Termos de Serviço do WhatsApp/Meta** e **pode resultar em advertência, limitação ou banimento
+permanente** do(s) número(s) e da(s) conta(s) envolvidos, entre outras consequências. **Você é o único
+responsável** por avaliar a legalidade e a conformidade do uso na sua jurisdição e no seu caso, incluindo o
+respeito a leis de proteção de dados (por exemplo, LGPD/GDPR), anti-spam e consentimento dos destinatários.
+
+**SEM GARANTIAS.** Conforme a **Seção 15 da GNU GPL-3.0** (ver [`LICENSE`](./LICENSE)), o software é fornecido
+"COMO ESTÁ" ("AS IS"), sem garantias de qualquer natureza, expressas ou implícitas, incluindo — mas não se
+limitando a — garantias de comercialização e adequação a um propósito específico. Todo o risco quanto à
+qualidade e ao desempenho do programa é seu. Não garantimos que a migração, a conexão ou o envio funcionem em
+qualquer cenário, nem que o comportamento das APIs de terceiros ou do WhatsApp permaneça estável.
+
+**LIMITAÇÃO DE RESPONSABILIDADE.** Conforme a **Seção 16 da GNU GPL-3.0**, em nenhuma hipótese os autores,
+contribuidores ou mantenedores deste projeto serão responsáveis por quaisquer danos diretos, indiretos,
+incidentais, especiais, exemplares ou consequenciais — incluindo, sem limitação, banimento de contas, perda
+de sessões, dados, mensagens, receita ou lucros — decorrentes do uso ou da impossibilidade de uso deste
+software, ainda que avisados da possibilidade de tais danos. **Ao usar esta ferramenta, você assume
+integralmente todo e qualquer risco.**
+
+## Licença
+
+Distribuído sob a **GNU General Public License v3.0** — veja [`LICENSE`](./LICENSE) para o texto completo.
+As isenções de garantia e a limitação de responsabilidade acima refletem as Seções 15 e 16 dessa licença e
+não as substituem; em caso de divergência, prevalece o texto oficial da GPL-3.0.
