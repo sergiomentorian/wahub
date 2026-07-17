@@ -1,0 +1,187 @@
+# wa-hub — stack Docker do hub de APIs não-oficiais do WhatsApp.
+# Sobe Evolution API + Evolution Go + WuzAPI + WAHA + Postgres + Redis + broker.
+# UAZAPI NÃO entra (é SaaS hospedado externo — o broker fala com ela por HTTP).
+#
+# Uso:  cp .env.example .env  &&  (edite os valores)  &&  docker compose up -d
+# UI:   http://127.0.0.1:8090   (única porta exposta; protegida por HUB_SECRET)
+#
+# [AUDIT 2026-07-16] Correções de boot embutidas:
+#   - DATABASE_PROVIDER=postgresql (NÃO "postgres" -> falha "Database provider invalid")
+#   - URI Evolution com ?schema=evolution_api ; DSNs com ?sslmode=disable
+#   - depends_on: condition: service_healthy (não a forma curta start-only)
+#   - tags de imagem FIXAS via .env (nunca :latest em produção)
+name: wa-hub
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    # [AUDIT] max_connections default (100) NÃO basta p/ 5 APIs + broker (cada uma abre
+    # seu pool) → "sorry, too many clients already". Subimos p/ 400 + shm p/ os buffers.
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=400"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "idle_in_transaction_session_timeout=60000"
+    shm_size: 512mb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d   # só roda no 1º boot (volume vazio) — ver init-db/*.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [wa-hub-net]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    networks: [wa-hub-net]
+    restart: unless-stopped
+
+  evolution:
+    image: ${EVO_IMAGE:-evoapicloud/evolution-api:v2.3.7}
+    environment:
+      SERVER_PORT: 8080
+      AUTHENTICATION_API_KEY: ${EVO_GLOBAL_KEY}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: "postgresql://postgres:${PG_PASSWORD}@postgres:5432/evolution_db?schema=evolution_api"
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: "redis://redis:6379/6"
+      CACHE_REDIS_PREFIX_KEY: "evolution"
+      CACHE_LOCAL_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks: [wa-hub-net]
+    restart: unless-stopped
+
+  evogo:
+    image: ${EVOGO_IMAGE:-evoapicloud/evolution-go:0.7.2}
+    environment:
+      # [AUDIT] env espelhado de um container evogo funcional (config validada ao vivo).
+      # Faltavam os "*_ENABLED=false": sem eles o binário exige a sub-config (MinIO/AMQP)
+      # e aborta com "required configuration variable is missing".
+      SERVER_PORT: 8082
+      CLIENT_NAME: evolution
+      OS_NAME: "Evolution GO"
+      GLOBAL_API_KEY: ${EVOGO_GLOBAL_KEY}
+      POSTGRES_AUTH_DB: "postgresql://postgres:${PG_PASSWORD}@postgres:5432/evogo_auth?sslmode=disable"
+      POSTGRES_USERS_DB: "postgresql://postgres:${PG_PASSWORD}@postgres:5432/evogo_users?sslmode=disable"
+      DATABASE_SAVE_MESSAGES: "false"
+      CONNECT_ON_STARTUP: "false"
+      MINIO_ENABLED: "false"
+      AMQP_GLOBAL_ENABLED: "false"
+      LOGTYPE: console
+      WADEBUG: INFO
+    ports:
+      - "127.0.0.1:8082:8082"   # interface/manager do EvoGo (só localhost) — p/ ativar a licença
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [wa-hub-net]
+    restart: unless-stopped
+    # [AUDIT] LICENÇA obrigatória: ativar via GET /license/activate?code=... após subir.
+    #         (auto-ativação por env headless NÃO comprovada). Sem licença NÃO conecta.
+
+  wuzapi:
+    # [AUDIT] UPSTREAM asternic/wuzapi. O `docker compose build` (bake) no Windows NÃO resolve
+    # contexto Git remoto → construa a imagem UMA vez com o Dockerfile do repo:
+    #     docker build -t wuzapi:hub https://github.com/asternic/wuzapi.git
+    # O upstream NÃO tem /session/import-web-creds → o broker importa via SQL direto (WUZAPI_IMPORT_MODE=auto).
+    image: ${WUZAPI_IMAGE:-wuzapi:hub}
+    environment:
+      WUZAPI_ADMIN_TOKEN: ${WUZAPI_ADMIN_TOKEN}
+      DB_USER: postgres
+      DB_PASSWORD: ${PG_PASSWORD}
+      DB_NAME: wuzapi
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_SSLMODE: disable
+      TZ: America/Sao_Paulo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [wa-hub-net]
+    restart: unless-stopped
+
+  waha:
+    image: ${WAHA_IMAGE:-devlikeapro/waha:noweb-2026.7.1}   # variante NOWEB (engine da stack); tag = <variante>-<versao>
+    environment:
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      WHATSAPP_DEFAULT_ENGINE: NOWEB                  # [AUDIT] NOWEB = alvo de injeção da v1
+      WAHA_PRINT_QR: "false"
+    volumes:
+      - waha_sessions:/app/.sessions                  # broker escreve aqui p/ injetar NOWEB (sessão parada)
+    networks: [wa-hub-net]
+    restart: unless-stopped
+
+  broker:
+    build: { context: ./broker }
+    image: zdgzpro/wa-hub-broker:local
+    environment:
+      PORT: 8090
+      HUB_SECRET: ${HUB_SECRET}
+      # Evolution
+      EVO_API_URL: "http://evolution:8080"
+      EVO_API_KEY: ${EVO_GLOBAL_KEY}
+      EVO_DATABASE_URI: "postgresql://postgres:${PG_PASSWORD}@postgres:5432/evolution_db?sslmode=disable"
+      EVO_REDIS_URI: "redis://redis:6379/6"
+      EVO_REDIS_PREFIX: "evolution"
+      # Evolution Go
+      EVOGO_API_URL: "http://evogo:8082"
+      EVOGO_API_KEY: ${EVOGO_GLOBAL_KEY}
+      EVOGO_AUTH_DATABASE_URI: "postgresql://postgres:${PG_PASSWORD}@postgres:5432/evogo_auth?sslmode=disable"
+      EVOGO_USERS_DATABASE_URI: "postgresql://postgres:${PG_PASSWORD}@postgres:5432/evogo_users?sslmode=disable"
+      # WuzAPI (upstream asternic ou fork com import nativo — o adapter cobre os dois)
+      WUZAPI_API_URL: "http://wuzapi:8080"
+      WUZAPI_ADMIN_TOKEN: ${WUZAPI_ADMIN_TOKEN}
+      WUZAPI_DATABASE_URI: "postgresql://postgres:${PG_PASSWORD}@postgres:5432/wuzapi?sslmode=disable"
+      WUZAPI_IMPORT_MODE: ${WUZAPI_IMPORT_MODE:-auto}
+      # WAHA
+      WAHA_API_URL: "http://waha:3000"
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      WAHA_SESSIONS_DIR: "/waha-sessions"
+      # UAZAPI (hospedado externo)
+      UAZAPI_API_URL: ${UAZAPI_API_URL:-https://api.uazapi.com}
+      UAZAPI_ADMIN_TOKEN: ${UAZAPI_ADMIN_TOKEN}
+      BROKER_CONFIG_DIR: /config                      # config runtime persistida (instalações externas)
+    volumes:
+      - waha_sessions:/waha-sessions                  # compartilha o volume da WAHA p/ inject NOWEB
+      - broker_config:/config                         # runtime-config.json (sobrevive a rebuild)
+    ports:
+      - "127.0.0.1:8090:8090"                         # ÚNICA porta exposta (bind local; remoto = Traefik + HUB_SECRET)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      evolution:
+        condition: service_started
+      evogo:
+        condition: service_started
+      wuzapi:
+        condition: service_started
+      waha:
+        condition: service_started
+    networks: [wa-hub-net]
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  waha_sessions:
+  broker_config:
+
+networks:
+  wa-hub-net:
+    driver: bridge

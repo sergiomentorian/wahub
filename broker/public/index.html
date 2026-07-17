@@ -1,0 +1,2579 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WA Hub — Broker · Z-PRO</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ══════════════════════════════════════════════════════════════════════════
+       Design tokens — espelham frontend/src/styles/globals.css do Z-PRO
+       (shadcn/zinc em HSL; light default + .dark). Marca: indigo do logo Z-PRO.
+       ══════════════════════════════════════════════════════════════════════════ */
+    :root {
+      --background: 240 10% 98.5%;
+      --foreground: 240 10% 3.9%;
+      --card: 0 0% 100%;
+      --card-foreground: 240 10% 3.9%;
+      --popover: 0 0% 100%;
+      --popover-foreground: 240 10% 3.9%;
+      --primary: 240 5.9% 10%;
+      --primary-foreground: 0 0% 98%;
+      --secondary: 240 4.8% 95.9%;
+      --secondary-foreground: 240 5.9% 10%;
+      --muted: 240 4.8% 95.9%;
+      --muted-foreground: 240 3.8% 46.1%;
+      --accent: 240 5% 93.5%;
+      --accent-foreground: 240 5.9% 10%;
+      --destructive: 0 84.2% 60.2%;
+      --success: 142 76% 36%;
+      --warning: 38 92% 50%;
+      --info: 217 91% 60%;
+      --border: 240 5.9% 90%;
+      --input: 240 5.9% 90%;
+      --ring: 240 5.9% 10%;
+      --brand: 239 84% 67%;                 /* indigo do logo Z-PRO */
+      --brand-strong: 243 75% 59%;
+      --radius: 0.625rem;
+
+      --shadow-xs: 0 1px 2px hsl(240 10% 10% / 0.05);
+      --shadow-sm: 0 1px 2px hsl(240 10% 10% / 0.06), 0 1px 3px hsl(240 10% 10% / 0.04);
+      --shadow-md: 0 2px 4px hsl(240 10% 10% / 0.05), 0 4px 12px -2px hsl(240 10% 10% / 0.08);
+      --shadow-lg: 0 4px 8px hsl(240 10% 10% / 0.05), 0 12px 28px -6px hsl(240 10% 10% / 0.14);
+
+      --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+      --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+
+      --sidebar-background: 0 0% 98%;
+      --sidebar-foreground: 240 5.3% 26.1%;
+      --sidebar-accent: 240 4.8% 95.9%;
+      --sidebar-accent-foreground: 240 5.9% 10%;
+      --sidebar-border: 220 13% 91%;
+
+      --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    .dark {
+      --background: 240 10% 3.5%;
+      --foreground: 0 0% 98%;
+      --card: 240 6% 7%;
+      --card-foreground: 0 0% 98%;
+      --popover: 240 6% 9%;
+      --popover-foreground: 0 0% 98%;
+      --primary: 0 0% 98%;
+      --primary-foreground: 240 5.9% 10%;
+      --secondary: 240 3.7% 15.9%;
+      --secondary-foreground: 0 0% 98%;
+      --muted: 240 3.7% 15.9%;
+      --muted-foreground: 240 5% 64.9%;
+      --accent: 240 3.7% 15.9%;
+      --accent-foreground: 0 0% 98%;
+      --destructive: 0 72% 55%;
+      --border: 240 3.7% 15.9%;
+      --input: 240 3.7% 15.9%;
+      --ring: 240 4.9% 83.9%;
+
+      --shadow-xs: 0 1px 2px hsl(0 0% 0% / 0.3);
+      --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.35), inset 0 1px 0 hsl(0 0% 100% / 0.03);
+      --shadow-md: 0 2px 6px hsl(0 0% 0% / 0.4), inset 0 1px 0 hsl(0 0% 100% / 0.04);
+      --shadow-lg: 0 8px 28px hsl(0 0% 0% / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.05);
+
+      --sidebar-background: 240 5.9% 10%;
+      --sidebar-foreground: 240 4.8% 95.9%;
+      --sidebar-accent: 240 3.7% 15.9%;
+      --sidebar-accent-foreground: 240 4.8% 95.9%;
+      --sidebar-border: 240 3.7% 15.9%;
+    }
+
+    /* ── base ─────────────────────────────────────────────────────────────── */
+    * { box-sizing: border-box; }
+    html { overflow-x: hidden; }
+    html, body { max-width: 100%; }
+    body {
+      margin: 0;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      font: 14px/1.55 var(--font-sans);
+      font-feature-settings: "rlig" 1, "calt" 1;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overscroll-behavior: none;
+      transition: background .25s var(--ease-out-soft), color .25s var(--ease-out-soft);
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / .2); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / .4); }
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+    a { color: hsl(var(--info)); }
+    code { background: hsl(var(--muted)); padding: 1px 5px; border-radius: 5px; font-size: 12px; font-family: var(--font-mono); }
+    .muted { color: hsl(var(--muted-foreground)); }
+    .hidden { display: none !important; }
+    .tnum, .numcell, .gnum, .paircode { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid hsl(var(--ring)); outline-offset: 2px; border-radius: 8px;
+    }
+    svg.ic { width: 17px; height: 17px; flex: 0 0 auto; }
+
+    /* ── shell: sidebar + main ────────────────────────────────────────────── */
+    .app { min-height: 100dvh; }
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; width: 264px; z-index: 50;
+      display: flex; flex-direction: column;
+      background: hsl(var(--sidebar-background));
+      border-right: 1px solid hsl(var(--sidebar-border));
+      transition: transform .28s var(--ease-out-soft), background .25s var(--ease-out-soft);
+    }
+    .side-head {
+      display: flex; align-items: center; gap: 11px; padding: 18px 16px 14px;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+    }
+    .side-head img.brandico { width: 36px; height: 36px; border-radius: 9px; display: block; box-shadow: var(--shadow-xs); }
+    .side-head .t { min-width: 0; }
+    .side-head .t b { display: block; font-size: 15px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; color: hsl(var(--sidebar-accent-foreground)); }
+    .side-head .t b .em { color: hsl(var(--brand-strong)); }
+    .side-head .t small { display: block; font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 1px; }
+    .side-nav { flex: 1; overflow-y: auto; padding: 10px 12px 18px; }
+    .nav-sec { margin-top: 16px; }
+    .nav-sec:first-child { margin-top: 6px; }
+    .nav-lbl {
+      font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+      color: hsl(var(--muted-foreground)); padding: 0 10px; margin-bottom: 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+      padding: 9px 10px 9px 13px; margin-top: 2px; border: 0; border-radius: 9px;
+      background: transparent; color: hsl(var(--sidebar-foreground));
+      font: 500 13.5px/1.3 var(--font-sans); cursor: pointer; position: relative;
+      transition: background .16s var(--ease-snappy), color .16s var(--ease-snappy);
+    }
+    .nav-item svg { width: 17px; height: 17px; opacity: .8; transition: opacity .16s; }
+    .nav-item:hover { background: hsl(var(--sidebar-accent)); }
+    .nav-item.active { background: hsl(var(--sidebar-accent)); color: hsl(var(--sidebar-accent-foreground)); font-weight: 600; }
+    .nav-item.active svg { opacity: 1; color: hsl(var(--brand-strong)); }
+    .nav-item.active::before {
+      content: ""; position: absolute; left: 0; top: 22%; bottom: 22%; width: 3px;
+      border-radius: 999px; background: hsl(var(--brand-strong));
+    }
+    .side-foot {
+      border-top: 1px solid hsl(var(--sidebar-border)); padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .themebtn {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 9px 11px; border: 1px solid hsl(var(--sidebar-border)); border-radius: 9px;
+      background: transparent; color: hsl(var(--sidebar-foreground));
+      font: 500 13px var(--font-sans); cursor: pointer;
+      transition: background .16s var(--ease-snappy), border-color .16s var(--ease-snappy);
+    }
+    .themebtn:hover { background: hsl(var(--sidebar-accent)); }
+    .themebtn svg { width: 16px; height: 16px; }
+    /* promo Z-PRO no rodapé do sidebar (referência: oauth-hub side-promo) */
+    .side-promo {
+      position: relative; overflow: hidden;
+      border: 1px solid hsl(var(--brand) / .35); border-radius: 12px; padding: 13px;
+      background:
+        radial-gradient(130px 90px at 100% 0%, hsl(var(--brand) / .18), transparent 70%),
+        linear-gradient(150deg, hsl(var(--brand) / .08), hsl(var(--sidebar-accent) / .5));
+      display: flex; flex-direction: column; gap: 9px;
+    }
+    .sp-head { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .sp-ico { width: 34px; height: 34px; border-radius: 9px; display: block; box-shadow: var(--shadow-xs); transition: transform .18s var(--ease-snappy); }
+    .sp-head:hover .sp-ico { transform: scale(1.05) rotate(-3deg); }
+    .sp-tx b { display: block; font-size: 14px; font-weight: 800; letter-spacing: -.01em; color: hsl(var(--sidebar-accent-foreground)); line-height: 1.1; }
+    .sp-tx small { display: block; font-size: 10px; color: hsl(var(--brand-strong)); font-weight: 700; text-transform: uppercase; letter-spacing: .07em; margin-top: 2px; }
+    .dark .sp-tx small { color: hsl(234 90% 78%); }
+    .side-promo .promo-text { font-size: 11.5px; color: hsl(var(--muted-foreground)); line-height: 1.45; }
+    .promo-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%;
+      text-decoration: none;
+      background: linear-gradient(150deg, #6366f1, #4f46e5); color: #fff;
+      font-size: 12px; font-weight: 700; padding: 8px 11px; border-radius: 9px;
+      box-shadow: 0 2px 8px -2px hsl(var(--brand) / .5), var(--shadow-xs);
+      transition: transform .16s var(--ease-snappy), opacity .16s var(--ease-snappy), box-shadow .16s var(--ease-snappy);
+    }
+    .promo-btn:hover { transform: translateY(-1px); opacity: .96; box-shadow: 0 4px 14px -3px hsl(var(--brand) / .6), var(--shadow-sm); }
+    .promo-btn svg { width: 13px; height: 13px; transition: transform .16s var(--ease-snappy); }
+    .promo-btn:hover svg { transform: translateX(2px); }
+    .side-community { text-align: center; }
+    .side-community a {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
+      color: hsl(var(--muted-foreground)); text-decoration: none; transition: color .16s var(--ease-snappy);
+    }
+    .side-community a:hover { color: hsl(var(--sidebar-accent-foreground)); }
+    .side-community svg { width: 14px; height: 14px; color: #ff4d4d; }
+    /* !important: regras utilitárias de tema — vencem .promo img.plogo/.zprolink img (display:block) */
+    .logo-dark { display: none !important; }
+    .dark .logo-dark { display: block !important; }
+    .dark .logo-light { display: none !important; }
+
+    .scrim {
+      position: fixed; inset: 0; z-index: 45; background: hsl(240 10% 4% / .5);
+      opacity: 0; pointer-events: none; transition: opacity .25s var(--ease-out-soft);
+      backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+    }
+    .scrim.show { opacity: 1; pointer-events: auto; }
+
+    .main { margin-left: 264px; min-width: 0; display: flex; flex-direction: column; min-height: 100dvh; }
+    .appbar {
+      position: sticky; top: 0; z-index: 40;
+      display: flex; align-items: center; gap: 12px; height: 58px; padding: 0 22px;
+      background: hsl(var(--background) / .85);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .appbar .vtitle { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+    .appbar .vsub { font-size: 12px; color: hsl(var(--muted-foreground)); display: none; }
+    @media (min-width: 640px) { .appbar .vsub { display: block; } }
+    .appbar .spacer { flex: 1; }
+    .iconbtn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border: 1px solid hsl(var(--border)); border-radius: 9px;
+      background: hsl(var(--card)); color: hsl(var(--foreground)); cursor: pointer;
+      transition: background .16s var(--ease-snappy), border-color .16s var(--ease-snappy), transform .16s var(--ease-snappy);
+      box-shadow: var(--shadow-xs);
+    }
+    .iconbtn:hover { background: hsl(var(--accent)); }
+    .iconbtn:active { transform: scale(.96); }
+    .iconbtn svg { width: 17px; height: 17px; }
+    .menu-btn { display: none; }
+    .healthpill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border: 1px solid hsl(var(--border)); border-radius: 999px;
+      background: hsl(var(--card)); font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground));
+      box-shadow: var(--shadow-xs); white-space: nowrap;
+    }
+    .content { width: 100%; max-width: 1140px; margin: 0 auto; padding: 24px 26px 56px; flex: 1; }
+
+    @media (max-width: 960px) {
+      .main { margin-left: 0; }
+      .sidebar { transform: translateX(-103%); box-shadow: var(--shadow-lg); }
+      .sidebar.open { transform: none; }
+      .menu-btn { display: inline-flex; }
+      .content { padding: 18px 14px 48px; }
+      .appbar { padding: 0 14px; }
+    }
+
+    /* ── views (transição de seção) ───────────────────────────────────────── */
+    .view { display: none; }
+    .view.active { display: block; animation: viewIn .3s var(--ease-out-soft); }
+    @keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    /* ── cards ────────────────────────────────────────────────────────────── */
+    .card {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: calc(var(--radius) + 4px); padding: 20px; margin-top: 16px;
+      box-shadow: var(--shadow-sm);
+      transition: background .25s var(--ease-out-soft), border-color .25s var(--ease-out-soft);
+    }
+    .card:first-child { margin-top: 0; }
+    .card h2 { display: flex; align-items: center; gap: 9px; font-size: 14.5px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 14px; }
+    .card h2 svg { width: 16px; height: 16px; color: hsl(var(--brand-strong)); }
+    .card h2 .sub { color: hsl(var(--muted-foreground)); font-weight: 400; font-size: 12.5px; }
+    .hint { font-size: 12px; color: hsl(var(--muted-foreground)); margin-top: 8px; }
+    .sep { height: 1px; background: hsl(var(--border)); margin: 16px 0; border: 0; }
+
+    /* ── KPIs ─────────────────────────────────────────────────────────────── */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-top: 16px; }
+    .kpi {
+      background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+      border-radius: calc(var(--radius) + 4px); padding: 16px; box-shadow: var(--shadow-sm);
+      min-height: 118px; display: flex; flex-direction: column; position: relative; overflow: hidden;
+      transition: transform .18s var(--ease-snappy), box-shadow .18s var(--ease-snappy);
+    }
+    .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .kpi-ico {
+      width: 34px; height: 34px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center;
+      margin-bottom: auto; color: #fff; box-shadow: var(--shadow-xs);
+    }
+    .kpi-ico svg { width: 17px; height: 17px; }
+    .kpi-ico.g1 { background: linear-gradient(150deg, #6366f1, #4f46e5); }
+    .kpi-ico.g2 { background: linear-gradient(150deg, #10b981, #059669); }
+    .kpi-ico.g3 { background: linear-gradient(150deg, #3b82f6, #2563eb); }
+    .kpi-num { font-size: 1.85rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; margin-top: 12px; }
+    .kpi-lbl { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 6px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+    .kpi.apis { grid-column: span 2; }
+    .kpi.apis .kpi-num { font-size: 1.1rem; font-weight: 700; }
+    .apis-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    @media (max-width: 560px) { .kpi.apis { grid-column: span 1; } }
+
+    /* sparkline / gráficos SVG feitos à mão (referência: oauth-hub svgSpark) */
+    .kpi-spark { margin-top: 10px; min-height: 30px; }
+    .chart-svg { display: block; }
+    .spark-line { fill: none; stroke: hsl(var(--brand-strong)); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+    .spark-area { fill: hsl(var(--brand) / .14); stroke: none; }
+
+    /* mix de APIs (barras horizontais coloridas por API) */
+    .mixrow { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+    .mixlbl { flex: 0 0 108px; font-size: 12.5px; font-weight: 600; color: hsl(var(--foreground) / .85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mixbar { flex: 1; position: relative; height: 10px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; }
+    .mixfill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; transition: width .5s var(--ease-out-soft); }
+    .mixnum { flex: 0 0 auto; font-size: 12px; color: hsl(var(--muted-foreground)); }
+
+    /* grade 2 colunas do dashboard */
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+    .grid2 > .card { margin-top: 0; }
+    @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+
+    /* sub-título de seção dentro de modal */
+    .panel-sub { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+
+    /* ── forms ────────────────────────────────────────────────────────────── */
+    label { display: block; font-size: 11.5px; color: hsl(var(--muted-foreground)); margin: 0 0 6px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+    input[type=text], input[type=password], textarea, select {
+      width: 100%; background: hsl(var(--card)); color: hsl(var(--foreground));
+      border: 1px solid hsl(var(--input)); border-radius: var(--radius); padding: 9px 12px;
+      font-size: 13.5px; font-family: inherit; outline: none; box-shadow: var(--shadow-xs);
+      transition: border-color .16s var(--ease-snappy), box-shadow .16s var(--ease-snappy);
+    }
+    input:focus, textarea:focus, select:focus { border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / .12); }
+    textarea { resize: vertical; min-height: 130px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.45; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row > * { min-width: 0; }
+    .grow { flex: 1; }
+    .field + .field { margin-top: 14px; }
+
+    /* ── botões ───────────────────────────────────────────────────────────── */
+    button.btn {
+      background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border));
+      border-radius: var(--radius); padding: 9px 14px; cursor: pointer; font-size: 13px; font-weight: 600;
+      white-space: nowrap; font-family: inherit; display: inline-flex; align-items: center; gap: 7px;
+      box-shadow: var(--shadow-xs);
+      transition: background .16s var(--ease-snappy), border-color .16s var(--ease-snappy), transform .16s var(--ease-snappy), box-shadow .16s var(--ease-snappy);
+    }
+    button.btn svg { width: 15px; height: 15px; }
+    button.btn:hover { background: hsl(var(--accent)); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    button.btn:active { transform: none; }
+    button.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+    button.btn.sm { padding: 6px 11px; font-size: 12.5px; }
+    button.btn.sm svg { width: 14px; height: 14px; }
+    button.btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: hsl(var(--muted-foreground)); }
+    button.btn.ghost:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+    button.primary, button.btn.primary {
+      background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border: 1px solid hsl(var(--primary));
+      border-radius: var(--radius); padding: 9px 15px; cursor: pointer; font-size: 13px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 7px; font-family: inherit; white-space: nowrap;
+      box-shadow: var(--shadow-sm);
+      transition: opacity .16s var(--ease-snappy), transform .16s var(--ease-snappy), box-shadow .16s var(--ease-snappy);
+    }
+    button.primary svg { width: 15px; height: 15px; }
+    button.primary:hover { opacity: .9; transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    button.primary:active { transform: none; }
+    button.primary:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+    button.danger, button.btn.danger {
+      background: hsl(var(--destructive) / .09); border: 1px solid hsl(var(--destructive) / .35); color: hsl(var(--destructive));
+      border-radius: var(--radius); cursor: pointer; font-family: inherit; font-weight: 600; font-size: 13px;
+      padding: 9px 14px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+      transition: background .16s var(--ease-snappy), border-color .16s var(--ease-snappy);
+    }
+    button.danger svg { width: 14px; height: 14px; }
+    button.danger:hover { background: hsl(var(--destructive) / .16); border-color: hsl(var(--destructive)); }
+    a.btnlink {
+      display: inline-flex; align-items: center; gap: 7px; text-decoration: none;
+      border-radius: var(--radius); padding: 9px 15px; font-size: 13px; font-weight: 700; white-space: nowrap;
+      transition: transform .16s var(--ease-snappy), box-shadow .16s var(--ease-snappy), opacity .16s var(--ease-snappy);
+    }
+    a.btnlink.zpro { background: linear-gradient(150deg, #6366f1, #4f46e5); color: #fff; box-shadow: var(--shadow-sm); }
+    a.btnlink.zpro:hover { transform: translateY(-1px); opacity: .94; box-shadow: var(--shadow-md); }
+    a.btnlink svg { width: 15px; height: 15px; }
+
+    /* ── chips / badges / dots ────────────────────────────────────────────── */
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .badge {
+      font-size: .68rem; font-weight: 600; padding: .2rem .55rem; border-radius: 999px;
+      background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border));
+      display: inline-flex; align-items: center; gap: 6px; letter-spacing: .02em;
+    }
+    .chip { display: inline-flex; align-items: center; gap: 6px; font-size: .7rem; font-weight: 600; padding: .18rem .55rem; border-radius: 999px; border: 1px solid transparent; letter-spacing: .01em; }
+    .chip.ok { background: hsl(var(--success) / .12); color: hsl(var(--success)); border-color: hsl(var(--success) / .3); }
+    .chip.bad { background: hsl(var(--destructive) / .1); color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / .3); }
+    .chip.warn { background: hsl(var(--warning) / .13); color: hsl(28 80% 42%); border-color: hsl(var(--warning) / .4); }
+    .dark .chip.warn { color: hsl(var(--warning)); }
+    .chip.neutral { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border-color: hsl(var(--border)); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: hsl(var(--muted-foreground) / .4); flex: 0 0 auto; }
+    .dot.on { background: hsl(var(--success)); }
+    .dot.off { background: hsl(var(--muted-foreground) / .4); }
+    .dot.warn { background: hsl(var(--warning)); }
+    .dot.live { background: hsl(var(--success)); animation: livePulse 1.8s var(--ease-out-soft) infinite; }
+    @keyframes livePulse {
+      0% { box-shadow: 0 0 0 0 hsl(var(--success) / .5); }
+      70% { box-shadow: 0 0 0 6px hsl(var(--success) / 0); }
+      100% { box-shadow: 0 0 0 0 hsl(var(--success) / 0); }
+    }
+
+    /* ── banners ──────────────────────────────────────────────────────────── */
+    .banner { border-radius: var(--radius); padding: 10px 13px; font-size: 13px; margin-top: 12px; border: 1px solid transparent; line-height: 1.5; display: flex; gap: 9px; align-items: flex-start; }
+    .banner svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 2px; }
+    .banner > div { min-width: 0; }
+    .banner.info { background: hsl(var(--info) / .08); color: hsl(217 60% 40%); border-color: hsl(var(--info) / .25); }
+    .dark .banner.info { color: hsl(213 90% 78%); }
+    .banner.warn { background: hsl(var(--warning) / .1); color: hsl(28 70% 38%); border-color: hsl(var(--warning) / .35); }
+    .dark .banner.warn { color: hsl(41 90% 70%); }
+    .banner.err { background: hsl(var(--destructive) / .08); color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / .3); }
+    .banner.ok { background: hsl(var(--success) / .1); color: hsl(var(--success)); border-color: hsl(var(--success) / .3); }
+
+    /* ── lista de sessões ─────────────────────────────────────────────────── */
+    .sesslist { display: flex; flex-direction: column; gap: 12px; }
+    .sessgroup { border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) + 3px); overflow: hidden; background: hsl(var(--card)); box-shadow: var(--shadow-xs); transition: box-shadow .18s var(--ease-snappy); }
+    .sessgroup:hover { box-shadow: var(--shadow-sm); }
+    .sessgroup.multi { border-color: hsl(var(--brand) / .45); box-shadow: 0 0 0 1px hsl(var(--brand) / .12), var(--shadow-sm); }
+    .sessgroup-head {
+      display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+      background: hsl(var(--muted) / .6); border-bottom: 1px solid hsl(var(--border));
+      font-size: 12.5px; color: hsl(var(--muted-foreground));
+    }
+    .gnum { color: hsl(var(--foreground)); font-weight: 600; font-size: 12.5px; }
+    .numbadge { font-size: .64rem; padding: .14rem .5rem; border-radius: 999px; background: hsl(var(--brand) / .13); color: hsl(var(--brand-strong)); font-weight: 700; border: 1px solid hsl(var(--brand) / .3); }
+    .sessrow {
+      position: relative; display: flex; align-items: center; gap: 13px;
+      padding: 12px 14px 12px 17px; border-top: 1px solid hsl(var(--border));
+      transition: background .16s var(--ease-snappy);
+    }
+    .sessgroup > .sessrow:first-child, .sessgroup-head + .sessrow { border-top: 0; }
+    .sessrow::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--api-color, hsl(var(--muted-foreground) / .4)); }
+    .sessrow:hover { background: hsl(var(--accent) / .5); }
+    .sess-av {
+      width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 14px; color: #fff; text-transform: uppercase;
+      background: var(--api-color, hsl(var(--muted-foreground))); box-shadow: var(--shadow-xs), inset 0 1px 0 rgb(255 255 255 / .18);
+    }
+    .sess-main { flex: 1; min-width: 0; }
+    .sess-l1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sess-name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .sess-l2 { display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 12px; color: hsl(var(--muted-foreground)); flex-wrap: wrap; }
+    .apitag { display: inline-flex; align-items: center; font-size: .62rem; font-weight: 700; padding: .13rem .5rem; border-radius: 999px; background: var(--api-soft, hsl(var(--muted))); border: 1px solid var(--api-border, hsl(var(--border))); color: var(--api-ink, hsl(var(--muted-foreground))); text-transform: uppercase; letter-spacing: .04em; }
+    .st { display: inline-flex; align-items: center; gap: 6px; }
+    .sess-actions { flex: 0 0 auto; }
+    .rowbtns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; opacity: 1; transition: opacity .18s var(--ease-snappy); }
+    @media (hover: hover) and (min-width: 961px) {
+      .sessrow .rowbtns { opacity: 0; }
+      .sessrow:hover .rowbtns, .sessrow:focus-within .rowbtns { opacity: 1; }
+    }
+    @media (max-width: 960px) {
+      .sessrow { flex-wrap: wrap; }
+      .sess-actions { width: 100%; }
+      .rowbtns { justify-content: flex-start; }
+    }
+
+    /* ── modais ───────────────────────────────────────────────────────────── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 60; overflow-y: auto;
+      background: hsl(240 10% 4% / .45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px;
+    }
+    .dark .overlay { background: hsl(240 10% 2% / .65); }
+    .overlay.hidden { display: none; }
+    .modal {
+      background: hsl(var(--popover)); border: 1px solid hsl(var(--border));
+      border-radius: calc(var(--radius) + 6px); width: 100%; max-width: 520px; padding: 22px;
+      box-shadow: var(--shadow-lg); animation: modalIn .28s var(--ease-out-soft);
+    }
+    @keyframes modalIn { from { opacity: 0; transform: translateY(-12px) scale(.985); } to { opacity: 1; transform: none; } }
+    .modal.wide { max-width: 620px; }
+    .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .modal-head h3 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+    .modal-head h3 svg { width: 16px; height: 16px; color: hsl(var(--brand-strong)); }
+    .modal-head p { margin: 4px 0 0; font-size: 12.5px; color: hsl(var(--muted-foreground)); }
+    .xbtn {
+      background: transparent; border: 0; color: hsl(var(--muted-foreground)); cursor: pointer;
+      width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 8px; flex: 0 0 auto;
+      transition: color .16s var(--ease-snappy), background .16s var(--ease-snappy);
+    }
+    .xbtn svg { width: 16px; height: 16px; }
+    .xbtn:hover { color: hsl(var(--foreground)); background: hsl(var(--accent)); }
+    .xbtn:disabled { opacity: .35; cursor: not-allowed; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
+    #cfmMessage { color: hsl(var(--foreground) / .85); font-size: 13.5px; line-height: 1.55; }
+
+    /* radio / toggle */
+    .radiorow { display: flex; gap: 8px; align-items: center; }
+    .radiorow input[type=radio] { width: auto; accent-color: hsl(var(--brand-strong)); }
+    .toggle { display: flex; gap: 10px; align-items: center; padding: 11px 13px; background: hsl(var(--muted) / .5); border: 1px solid hsl(var(--border)); border-radius: var(--radius); transition: border-color .16s var(--ease-snappy); }
+    .toggle:hover { border-color: hsl(var(--ring) / .4); }
+    .toggle input { width: auto; accent-color: hsl(var(--brand-strong)); }
+    .toggle .tx { flex: 1; }
+    .toggle .tx b { display: block; font-size: 13px; }
+    .toggle .tx small { color: hsl(var(--muted-foreground)); font-size: 12px; }
+    .toggle.disabled { opacity: .55; }
+
+    /* ── QR ───────────────────────────────────────────────────────────────── */
+    .qrbox { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 0; }
+    #qrImgHolder { text-align: center; max-width: 100%; }
+    #qrImgHolder.hasimg { background: #fff; padding: 12px; border-radius: var(--radius); display: inline-block; box-shadow: var(--shadow-md); border: 1px solid hsl(var(--border)); }
+    .qrimg { width: 260px; max-width: 78vw; height: auto; display: block; margin: 0 auto; image-rendering: pixelated; }
+    .qrimg-empty { width: 260px; height: 260px; max-width: 78vw; border: 1px dashed hsl(var(--border)); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; color: hsl(var(--muted-foreground)); font-size: 13px; text-align: center; padding: 16px; background: hsl(var(--muted) / .4); }
+    #qrPairWrap { max-width: 100%; }
+    .paircode { font-size: 11px; letter-spacing: 1px; background: hsl(var(--muted)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 10px 16px; word-break: break-all; overflow-wrap: anywhere; white-space: normal; max-width: 100%; max-height: 120px; overflow-y: auto; }
+
+    /* ── steps / progresso da migração ────────────────────────────────────── */
+    .steps { margin-top: 14px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); overflow: hidden; background: hsl(var(--muted) / .4); }
+    .step { display: flex; gap: 10px; align-items: flex-start; padding: 10px 13px; border-top: 1px solid hsl(var(--border)); font-size: 13px; animation: stepIn .25s var(--ease-out-soft); }
+    @keyframes stepIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+    .step:first-child { border-top: 0; }
+    .step .ic { flex: 0 0 18px; display: inline-flex; justify-content: center; padding-top: 2px; }
+    .step .ic svg { width: 14px; height: 14px; }
+    .step .tx { flex: 1; word-break: break-word; }
+    .step .tx small { display: block; color: hsl(var(--muted-foreground)); }
+
+    .migload { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; background: hsl(var(--brand) / .08); border: 1px solid hsl(var(--brand) / .3); border-radius: var(--radius); }
+    .spinner { width: 20px; height: 20px; flex: 0 0 auto; border: 2.5px solid hsl(var(--brand) / .25); border-top-color: hsl(var(--brand-strong)); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .migload .mltx { flex: 1; min-width: 0; font-size: 13px; color: hsl(var(--brand-strong)); }
+    .dark .migload .mltx { color: hsl(234 90% 80%); }
+    .migload .mltx b { font-weight: 700; }
+    .migload .mltx small { display: block; color: hsl(var(--muted-foreground)); font-size: 11.5px; margin-top: 1px; }
+    .migload .mlsec { font-variant-numeric: tabular-nums; }
+    .indet { position: relative; height: 4px; margin-top: 10px; border-radius: 999px; background: hsl(var(--brand) / .15); overflow: hidden; }
+    .indet::before { content: ""; position: absolute; left: -40%; top: 0; height: 100%; width: 40%; border-radius: 999px; background: linear-gradient(90deg, transparent, hsl(var(--brand-strong)), transparent); animation: indet 1.15s ease-in-out infinite; }
+    @keyframes indet { 0% { left: -40%; } 100% { left: 100%; } }
+
+    /* ── toast ────────────────────────────────────────────────────────────── */
+    .globalerr {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 80; max-width: 92%;
+      background: hsl(var(--popover)); color: hsl(var(--popover-foreground));
+      border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+      box-shadow: var(--shadow-lg); font-weight: 600; font-size: 13px;
+      display: inline-flex; align-items: center; gap: 9px; padding: 10px 14px;
+      animation: toastIn .3s var(--ease-out-soft);
+    }
+    .globalerr svg { width: 16px; height: 16px; flex: 0 0 auto; }
+    .globalerr.ok svg { color: hsl(var(--success)); }
+    .globalerr.err svg { color: hsl(var(--destructive)); }
+    .globalerr.warn svg { color: hsl(var(--warning)); }
+    .globalerr.info svg { color: hsl(var(--info)); }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+    /* ── config de APIs (grade) ───────────────────────────────────────────── */
+    .cfggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-top: 4px; }
+    .cfgcard {
+      border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) + 2px);
+      padding: 14px; display: flex; flex-direction: column; gap: 10px; background: hsl(var(--card));
+      box-shadow: var(--shadow-xs);
+      transition: transform .18s var(--ease-snappy), box-shadow .18s var(--ease-snappy);
+    }
+    .cfgcard:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+    .cfgcard .h { display: flex; align-items: center; gap: 10px; }
+    .cfgcard .av { width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #fff; }
+    .cfgcard .nm { font-weight: 700; font-size: 13.5px; }
+    .cfgcard .fam { font-size: 11px; color: hsl(var(--muted-foreground)); }
+    .cfgcard .act { margin-top: auto; }
+
+    /* ── steps do passaporte ──────────────────────────────────────────────── */
+    .stepnum { flex: 0 0 20px; height: 20px; border-radius: 999px; background: hsl(var(--brand) / .12); color: hsl(var(--brand-strong)); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+
+    /* ── promo / sobre ────────────────────────────────────────────────────── */
+    .promo {
+      display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+      background: linear-gradient(150deg, hsl(var(--brand) / .1), hsl(var(--card)) 55%);
+      border: 1px solid hsl(var(--brand) / .3); border-radius: calc(var(--radius) + 4px); padding: 18px 20px;
+      margin-top: 16px; box-shadow: var(--shadow-sm);
+    }
+    .promo img.plogo { height: 34px; display: block; flex: 0 0 auto; }
+    .promo .promo-tx { flex: 1; min-width: 190px; }
+    .promo .promo-tx b { display: block; font-size: 14px; font-weight: 700; }
+    .promo .promo-tx small { color: hsl(var(--muted-foreground)); font-size: 12.5px; }
+    .community { text-align: center; margin-top: 15px; font-size: 12.5px; }
+    .community a { color: hsl(var(--muted-foreground)); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: color .16s var(--ease-snappy); }
+    .community a:hover { color: hsl(var(--foreground)); }
+    .community svg { width: 15px; height: 15px; color: #ff4d4d; }
+    .foot { margin-top: 26px; font-size: 12px; color: hsl(var(--muted-foreground)); text-align: center; line-height: 1.7; }
+    .foot .brandline { font-size: 12.5px; margin-bottom: 6px; }
+    .foot .brandline a { font-weight: 700; text-decoration: none; color: hsl(var(--foreground) / .8); }
+    .foot .brandline a:hover { color: hsl(var(--brand-strong)); }
+    .foot .sepdot { color: hsl(var(--muted-foreground) / .5); margin: 0 8px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- ══ Sidebar ══════════════════════════════════════════════════════════ -->
+    <aside class="sidebar" id="sidebar" aria-label="Menu lateral">
+      <div class="side-head">
+        <a href="https://zpro.zdg.com.br/" target="_blank" rel="noopener noreferrer" aria-label="Z-PRO"><img class="brandico" src="/assets/brand-icon.png" alt="Z-PRO" /></a>
+        <div class="t">
+          <b>WA <span class="em">Hub</span></b>
+          <small>Broker · by Comunidade ZDG</small>
+        </div>
+      </div>
+
+      <nav class="side-nav">
+        <div class="nav-sec">
+          <div class="nav-lbl">Geral</div>
+          <button class="nav-item active" data-nav="overview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            Visão geral
+          </button>
+          <button class="nav-item" data-nav="sessions">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+            Sessões
+          </button>
+        </div>
+
+        <div class="nav-sec">
+          <div class="nav-lbl">Ações</div>
+          <button class="nav-item" id="navNewSession">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            Nova sessão (QR)
+          </button>
+          <button class="nav-item" data-nav="passport">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+            Colar passaporte
+          </button>
+        </div>
+
+        <div class="nav-sec">
+          <div class="nav-lbl">Sistema</div>
+          <button class="nav-item" data-nav="config">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            Configurações
+          </button>
+          <button class="nav-item" data-nav="about">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            Sobre o hub
+          </button>
+        </div>
+      </nav>
+
+      <div class="side-foot">
+        <div class="side-promo">
+          <a class="sp-head" href="https://zpro.zdg.com.br/" target="_blank" rel="noopener noreferrer" aria-label="Z-PRO">
+            <img class="sp-ico" src="/assets/brand-icon.png" alt="Z-PRO" />
+            <span class="sp-tx">
+              <b>Z-PRO</b>
+              <small>Multiatendimento</small>
+            </span>
+          </a>
+          <div class="promo-text">WhatsApp, Instagram, Messenger e mais canais em uma só plataforma.</div>
+          <a class="promo-btn" href="https://zpro.zdg.com.br/" target="_blank" rel="noopener noreferrer">
+            Conheça o Z-PRO
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </a>
+        </div>
+        <div class="side-community">
+          <a href="https://www.youtube.com/channel/UCrPbAoQKz42Gm0mLdWatAEA" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/></svg>
+            Comunidade ZDG no YouTube
+          </a>
+        </div>
+        <button class="themebtn" id="btnTheme" type="button" aria-label="Alternar tema">
+          <span id="themeIcoWrap" style="display:inline-flex"></span>
+          <span id="themeLbl">Tema escuro</span>
+        </button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <!-- ══ Main ═════════════════════════════════════════════════════════════ -->
+    <div class="main">
+      <header class="appbar">
+        <button class="iconbtn menu-btn" id="btnMenu" aria-label="Abrir menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg>
+        </button>
+        <div>
+          <div class="vtitle" id="viewTitle">Visão geral</div>
+          <div class="vsub" id="viewSub">status do broker e das APIs conectadas</div>
+        </div>
+        <div class="spacer"></div>
+        <span class="healthpill"><span class="dot" id="dotHealth"></span> <span id="healthLabel">/health não consultado</span></span>
+      </header>
+
+      <main class="content">
+
+        <!-- ══ VIEW: Visão geral ══════════════════════════════════════════ -->
+        <section class="view active" id="view-overview">
+          <div class="card">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Acesso ao broker <span class="sub">segredo do hub (x-hub-secret)</span>
+            </h2>
+            <div class="row">
+              <input class="grow" type="password" id="secret" placeholder="x-hub-secret (o mesmo do HUB_SECRET)" autocomplete="off" />
+              <button class="btn" id="btnEye" title="Mostrar/ocultar" type="button"></button>
+              <button class="primary" id="btnConnect">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                Conectar / Recarregar
+              </button>
+            </div>
+            <div class="hint">O segredo fica salvo neste navegador (localStorage) e é reaplicado ao recarregar a página. Toda chamada de dados usa o cabeçalho <code>x-hub-secret</code>. Para esquecer, apague o campo.</div>
+            <div class="sep"></div>
+            <div class="row" style="align-items:center; justify-content:space-between">
+              <div class="badges" id="healthBadges"></div>
+              <span class="chip neutral" id="healthApis">APIs: &mdash;</span>
+            </div>
+          </div>
+
+          <div class="kpis" id="kpiStrip">
+            <div class="kpi">
+              <span class="kpi-ico g1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>
+              <div class="kpi-num tnum" id="kpiTotal">&mdash;</div>
+              <div class="kpi-lbl">Sessões</div>
+            </div>
+            <div class="kpi">
+              <span class="kpi-ico g2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg></span>
+              <div class="kpi-num tnum" id="kpiConnected">&mdash;</div>
+              <div class="kpi-lbl">Conectadas</div>
+              <div class="kpi-spark" id="kpiConnSpark"></div>
+            </div>
+            <div class="kpi apis">
+              <span class="kpi-ico g3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></svg></span>
+              <div class="kpi-num tnum" id="kpiApisNum">&mdash;</div>
+              <div class="kpi-lbl">APIs ligadas</div>
+              <div class="apis-list" id="kpiApisList"></div>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="card">
+              <h2>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                Mix de APIs <span class="sub">sessões por API (conectadas/total)</span>
+              </h2>
+              <div id="apiMix"><div class="hint" style="margin-top:0">Conecte para ver a distribuição das sessões.</div></div>
+            </div>
+            <div class="card">
+              <h2>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
+                Como funciona <span class="sub">migração sem re-parear</span>
+              </h2>
+              <div class="hint" style="margin-top:0; font-size:13px; line-height:1.6">
+                Liste todas as sessões das APIs do hub, leia o QR de qualquer uma e <b>migre a sessão de uma API para outra sem re-parear</b> —
+                a identidade do aparelho (passaporte) é transferida e o destino conecta sem novo QR.
+                Acesse <b>Sessões</b> no menu para começar.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ══ VIEW: Sessões ══════════════════════════════════════════════ -->
+        <section class="view" id="view-sessions">
+          <div class="card">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+              Sessões <span class="sub">agrupadas por número — a mesma conta aparece em várias APIs</span>
+            </h2>
+            <div class="row" style="justify-content:flex-end; margin-bottom:12px">
+              <button class="primary" id="btnNewSession">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                Nova sessão (QR)
+              </button>
+              <button class="btn" id="btnReloadSessions">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                Recarregar
+              </button>
+            </div>
+            <div id="sessionsArea">
+              <div class="banner info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><div>Informe o segredo em <b>Visão geral</b> e clique em <b>Conectar / Recarregar</b>.</div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ══ VIEW: Colar passaporte ═════════════════════════════════════ -->
+        <section class="view" id="view-passport">
+          <div class="card">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+              Colar passaporte <span class="sub">fallback — importar o JSON "Copiar creds" da extensão PassKey</span>
+            </h2>
+
+            <div class="banner info">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              <div>Extensão <b>PassKey Linker</b> (Chrome):
+              <a href="https://chromewebstore.google.com/detail/passkey-linker/hehoacnepmncbjckgnfekfcgdijpigaj" target="_blank" rel="noopener noreferrer">abrir na Chrome Web Store</a></div>
+            </div>
+            <div class="steps">
+              <div class="step"><span class="stepnum">1</span><div class="tx">Instale a extensão PassKey Linker no Chrome.</div></div>
+              <div class="step"><span class="stepnum">2</span><div class="tx">Abra o <b>WhatsApp Web</b> (<a href="https://web.whatsapp.com" target="_blank" rel="noopener noreferrer">web.whatsapp.com</a>) já logado no número.</div></div>
+              <div class="step"><span class="stepnum">3</span><div class="tx">Clique em <b>"Copiar creds"</b> na extensão.</div></div>
+              <div class="step"><span class="stepnum">4</span><div class="tx">Cole o JSON abaixo e escolha a API/sessão de destino.</div></div>
+            </div>
+            <div class="banner warn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+              <div>Depois de importar, <b>saia/apague a sessão no WhatsApp Web</b> para não manter o aparelho logado em paralelo — senão o WhatsApp Web pode "roubar" a sessão do seu backend.</div>
+            </div>
+
+            <div class="field" style="margin-top:14px">
+              <label for="pasteJson">Passaporte (JSON)</label>
+              <textarea id="pasteJson" placeholder='Cole aqui o JSON de "Copiar creds" da extensão PassKey. Ex.: {"noiseKey":{...},"signedIdentityKey":{...},"me":{...},"account":{...}}'></textarea>
+              <span class="chip neutral" id="pasteChip" style="margin-top:8px">aguardando passaporte</span>
+            </div>
+            <div class="row">
+              <div class="grow field" style="margin-top:14px">
+                <label for="pasteApi">API destino</label>
+                <select id="pasteApi"></select>
+              </div>
+              <div class="grow field" style="margin-top:14px">
+                <label for="pasteSessionSel">Sessão destino</label>
+                <div class="row">
+                  <select class="grow" id="pasteSessionSel"><option value="">— sessão existente —</option></select>
+                  <button class="btn" id="btnPasteReload" title="Recarregar sessões da API" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="field" id="pasteNewBox">
+              <label for="pasteNewName">ou criar nova sessão (nome)</label>
+              <input type="text" id="pasteNewName" placeholder="deixe vazio para usar a sessão existente acima" autocomplete="off" />
+            </div>
+            <div class="sep"></div>
+            <button class="primary" id="btnPasteImport">Importar passaporte</button>
+            <div id="pasteResult"></div>
+          </div>
+        </section>
+
+        <!-- ══ VIEW: Configurações ════════════════════════════════════════ -->
+        <section class="view" id="view-config">
+          <div class="card">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              APIs do hub <span class="sub">host + token de admin (config em runtime, sem rebuild)</span>
+            </h2>
+            <div class="hint" style="margin-top:0; margin-bottom:12px">
+              Por padrão cada API usa a instalação da <b>stack</b> (.env) — sem regressão. Aqui você pode apontar
+              qualquer uma para uma <b>instalação externa</b> (URL + token e, quando a API exige, os DSNs de banco/volume).
+              A configuração é aplicada em runtime, <b>persistida no broker</b> (sobrevive a restart) e pode ser
+              revertida com "Restaurar padrão".
+            </div>
+            <div class="cfggrid" id="cfgGrid"><!-- preenchido via JS --></div>
+          </div>
+        </section>
+
+        <!-- ══ VIEW: Sobre ════════════════════════════════════════════════ -->
+        <section class="view" id="view-about">
+          <div class="card">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              Sobre o WA Hub <span class="sub">broker de sessões WhatsApp</span>
+            </h2>
+            <div style="font-size:13.5px; line-height:1.7; color:hsl(var(--foreground) / .85)">
+              O broker fala só com a própria origem (zero CORS) e orquestra as APIs da stack:
+              <b>Evolution API</b> e <b>WAHA</b> (família Baileys), <b>Evolution Go</b>, <b>WuzAPI</b> e <b>UAZAPI</b> (família whatsmeow).<br/><br/>
+              A migração <b>Tier 1</b> transfere a identidade do aparelho (o "passaporte") — o destino conecta <b>sem re-parear</b>;
+              histórico e mídias re-sincronizam no destino. A <b>Tier 2</b> (mesma família) copia também o store de chaves (migração quente).<br/><br/>
+              A UAZAPI é destino-only: recebe migração, mas não pode ser origem.
+            </div>
+          </div>
+
+          <div class="promo">
+            <a href="https://zpro.zdg.com.br/" target="_blank" rel="noopener noreferrer" aria-label="Z-PRO">
+              <img class="plogo logo-light" src="/assets/zpro-logo.png" alt="Z-PRO" />
+              <img class="plogo logo-dark" src="/assets/zpro-logo-dark.png" alt="Z-PRO" />
+            </a>
+            <div class="promo-tx">
+              <b>Plataforma completa de multiatendimento.</b>
+              <small>WhatsApp, Instagram, Messenger e muito mais em um só lugar.</small>
+            </div>
+            <div class="promo-actions">
+              <a class="btnlink zpro" href="https://zpro.zdg.com.br/" target="_blank" rel="noopener noreferrer">
+                Conheça o Z-PRO
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </a>
+            </div>
+          </div>
+
+          <div class="community">
+            <a href="https://www.youtube.com/channel/UCrPbAoQKz42Gm0mLdWatAEA" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/></svg>
+              Comunidade ZDG no YouTube
+            </a>
+          </div>
+
+          <div class="foot">
+            <div class="brandline">
+              <a href="https://zpro.zdg.com.br/" target="_blank" rel="noopener noreferrer">Z-PRO — Plataforma de Multiatendimento</a>
+              <span class="sepdot">&middot;</span>
+              <a href="https://www.youtube.com/channel/UCrPbAoQKz42Gm0mLdWatAEA" target="_blank" rel="noopener noreferrer">by Comunidade ZDG</a>
+            </div>
+            Broker do WA Hub — fala só com a própria origem (zero CORS). UAZAPI é destino-only (não pode ser origem).<br/>
+            Tier 1 migra a identidade (conecta sem QR); histórico/mídias re-sincronizam no destino.
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ===== Modal: Confirmacao ===== -->
+  <div class="overlay hidden" id="cfmOverlay">
+    <div class="modal" style="max-width:440px">
+      <div class="modal-head">
+        <div><h3 id="cfmTitle">Confirmar</h3></div>
+        <button class="xbtn" id="cfmClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div id="cfmMessage">&mdash;</div>
+      <div class="confirm-actions">
+        <button class="btn" id="cfmCancel">Cancelar</button>
+        <button class="btn primary" id="cfmOk">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal: Ler QR ===== -->
+  <div class="overlay hidden" id="qrOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg> Ler QR</h3>
+          <p id="qrSub">&mdash;</p>
+        </div>
+        <button class="xbtn" id="qrClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="qrbox">
+        <div id="qrImgHolder"><div class="qrimg-empty">Aguardando QR...</div></div>
+        <div id="qrPairWrap" class="hidden">
+          <div class="hint" style="text-align:center;margin:0 0 6px">Código de pareamento</div>
+          <div class="paircode" id="qrPair"></div>
+        </div>
+        <div id="qrStatus"><span class="chip neutral">iniciando...</span></div>
+        <button class="btn sm" id="btnQrRegen" title="Força a sessão a gerar um QR novo">Regenerar QR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal: Migrar ===== -->
+  <div class="overlay hidden" id="migOverlay">
+    <div class="modal wide">
+      <div class="modal-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg> Migrar sessão</h3>
+          <p id="migSub">&mdash;</p>
+        </div>
+        <button class="xbtn" id="migClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+
+      <div class="field">
+        <label>Origem</label>
+        <div class="banner info" style="margin-top:0" id="migFrom">&mdash;</div>
+      </div>
+
+      <div class="field">
+        <label for="migToApi">API destino</label>
+        <select id="migToApi"></select>
+      </div>
+
+      <div class="field">
+        <div class="radiorow" style="margin-bottom:8px">
+          <input type="radio" name="migDest" id="migDestExisting" value="existing" checked />
+          <label for="migDestExisting" style="margin:0;text-transform:none;font-weight:600;color:hsl(var(--foreground));font-size:13px">Sessão existente</label>
+        </div>
+        <div class="row">
+          <select class="grow" id="migToSession"><option value="">— carregando... —</option></select>
+          <button class="btn" id="btnMigReloadDest" title="Recarregar" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="radiorow" style="margin-bottom:8px">
+          <input type="radio" name="migDest" id="migDestNew" value="new" />
+          <label for="migDestNew" style="margin:0;text-transform:none;font-weight:600;color:hsl(var(--foreground));font-size:13px">Criar nova</label>
+        </div>
+        <input type="text" id="migToName" placeholder="nome da nova sessão no destino" autocomplete="off" disabled />
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="field">
+        <div class="toggle" id="tierToggleWrap">
+          <input type="checkbox" id="migTier2" />
+          <div class="tx">
+            <b>Tier 2 (store completo, migração quente)</b>
+            <small id="tierNote">Copia também as chaves de sessão. Só entre motores da mesma família.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="toggle">
+          <input type="checkbox" id="migCleanup" />
+          <div class="tx">
+            <b>Remover origem após sucesso</b>
+            <small>Apaga só a linha/instância local da origem (nunca faz logout do device).</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="migWebhook">URL de webhook do destino (opcional)</label>
+        <input type="text" id="migWebhook" placeholder="https://seu-sistema/webhook" autocomplete="off" />
+        <div class="hint">Re-registra o webhook no destino antes de conectar (senão a sessão migra e fica muda).</div>
+      </div>
+
+      <div class="banner info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <div>Tier 1: histórico/mídias re-sincronizam no destino. UAZAPI é destino-only (não pode ser origem).</div>
+      </div>
+
+      <div class="sep"></div>
+      <button class="primary" id="btnMigStart" style="width:100%; justify-content:center">Migrar</button>
+
+      <div id="migSteps"></div>
+      <div id="migResult"></div>
+    </div>
+  </div>
+
+  <!-- ===== Modal: Nova sessao (QR) ===== -->
+  <div class="overlay hidden" id="newOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Nova sessão (conectar por QR)</h3>
+          <p>Cria uma sessão nova na API escolhida e abre o QR para parear um número, sem depender da extensão/import de creds.</p>
+        </div>
+        <button class="xbtn" id="newClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+
+      <div class="field">
+        <label for="newApi">API</label>
+        <select id="newApi"></select>
+        <div class="hint" id="newApiHint">&mdash;</div>
+      </div>
+
+      <div class="field">
+        <label for="newName">Nome da sessão</label>
+        <input type="text" id="newName" placeholder="ex.: vendas, suporte, meu-numero" autocomplete="off" />
+        <div class="hint">Identificador da sessão na API. No Evolution o id da sessão é o próprio nome.</div>
+      </div>
+
+      <div class="banner info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <div>Depois de criar, o QR abre sozinho. Escaneie com o WhatsApp (Aparelhos conectados) para conectar.</div>
+      </div>
+
+      <div class="sep"></div>
+      <button class="primary" id="btnNewCreate" style="width:100%; justify-content:center">Criar e ler QR</button>
+      <div id="newResult"></div>
+    </div>
+  </div>
+
+  <!-- ===== Modal: Testar envio ===== -->
+  <div class="overlay hidden" id="sendOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg> Testar envio</h3>
+          <p id="sendSub">&mdash;</p>
+        </div>
+        <button class="xbtn" id="sendClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+
+      <div class="field">
+        <label>Sessão de origem</label>
+        <div class="banner info" style="margin-top:0" id="sendFrom">&mdash;</div>
+      </div>
+
+      <div class="field">
+        <label for="sendTo">Número de destino</label>
+        <input type="text" id="sendTo" placeholder="ex.: 5511999999999 (só dígitos, com DDI+DDD)" autocomplete="off" inputmode="numeric" />
+        <div class="hint">Formato E.164 sem símbolos: país + DDD + número.</div>
+      </div>
+
+      <div class="field">
+        <label for="sendText">Mensagem</label>
+        <input type="text" id="sendText" placeholder="texto da mensagem de teste" autocomplete="off" />
+      </div>
+
+      <div class="sep"></div>
+      <button class="primary" id="btnSendGo" style="width:100%; justify-content:center">Enviar</button>
+      <div id="sendResult"></div>
+    </div>
+  </div>
+
+  <!-- ===== Modal: Configurar API (host + token + webhook) ===== -->
+  <div class="overlay hidden" id="cfgOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h3 id="cfgTitle">Configurar API</h3>
+          <p id="cfgSub">Informe host e token de admin para ligar a API no broker.</p>
+        </div>
+        <button class="xbtn" id="cfgClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+
+      <div class="field">
+        <label for="cfgUrl">URL da API</label>
+        <input type="text" id="cfgUrl" placeholder="https://api.uazapi.com" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label for="cfgToken">Admin token</label>
+        <div class="row">
+          <input class="grow" type="password" id="cfgToken" placeholder="cole o admin token" autocomplete="off" />
+          <button class="btn" id="cfgTokenEye" title="Mostrar/ocultar" type="button"></button>
+        </div>
+        <div class="hint" id="cfgTokenHint">O token é enviado só quando você digita um novo.</div>
+      </div>
+
+      <div class="field">
+        <label for="cfgWebhook">Webhook URL (opcional)</label>
+        <input type="text" id="cfgWebhook" placeholder="https://seu-sistema/webhook" autocomplete="off" />
+      </div>
+
+      <div id="cfgExtraFields"><!-- campos avançados (instalação externa) por API, via JS --></div>
+
+      <div class="sep"></div>
+      <div class="row">
+        <button class="primary grow" id="btnCfgSave" style="justify-content:center">Salvar</button>
+        <button class="btn" id="btnCfgReset" title="Descarta a config runtime e volta ao padrão da stack (.env)">Restaurar padrão</button>
+      </div>
+      <div id="cfgResult"></div>
+    </div>
+  </div>
+
+  <div id="globalErr"></div>
+
+  <script>
+    "use strict";
+    var $ = function (id) { return document.getElementById(id); };
+
+    // ---- Ícones (Lucide, inline SVG — nunca emojis) ----------------------------
+    var ICON_PATHS = {
+      "qr-code": '<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>',
+      "send": '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+      "power": '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>',
+      "migrate": '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+      "trash": '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+      "check": '<path d="M20 6 9 17l-5-5"/>',
+      "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+      "alert": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+      "info": '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+      "dot": '<circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>',
+      "eye": '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+      "eye-off": '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+      "sun": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+      "moon": '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+      "settings": '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>'
+    };
+    function icon(name, extraClass) {
+      var p = ICON_PATHS[name] || ICON_PATHS.dot;
+      return '<svg class="' + (extraClass || "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+    }
+
+    // ---- Tema (light default = identidade Z-PRO; persiste em localStorage) -----
+    function applyTheme(t) {
+      var dark = t === "dark";
+      document.documentElement.classList.toggle("dark", dark);
+      try { localStorage.setItem("wa-hub-theme", t); } catch (e) {}
+      $("themeIcoWrap").innerHTML = icon(dark ? "sun" : "moon");
+      $("themeLbl").textContent = dark ? "Tema claro" : "Tema escuro";
+    }
+    (function initTheme() {
+      var saved = null;
+      try { saved = localStorage.getItem("wa-hub-theme"); } catch (e) {}
+      applyTheme(saved === "dark" ? "dark" : "light");
+    })();
+    $("btnTheme").addEventListener("click", function () {
+      applyTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
+    });
+
+    // ---- Navegação por views (sidebar) -----------------------------------------
+    var VIEWS = {
+      overview: { title: "Visão geral", sub: "status do broker e das APIs conectadas" },
+      sessions: { title: "Sessões", sub: "todas as sessões das APIs do hub" },
+      passport: { title: "Colar passaporte", sub: "importar creds da extensão PassKey" },
+      config:   { title: "Configurações", sub: "hosts e tokens das APIs" },
+      about:    { title: "Sobre o hub", sub: "como o broker funciona" }
+    };
+    function showView(name) {
+      if (!VIEWS[name]) name = "overview";
+      Array.prototype.slice.call(document.querySelectorAll(".view")).forEach(function (v) {
+        v.classList.toggle("active", v.id === "view-" + name);
+      });
+      Array.prototype.slice.call(document.querySelectorAll(".nav-item[data-nav]")).forEach(function (b) {
+        b.classList.toggle("active", b.getAttribute("data-nav") === name);
+      });
+      $("viewTitle").textContent = VIEWS[name].title;
+      $("viewSub").textContent = VIEWS[name].sub;
+      if (name === "config") refreshCfgModes(); // badges padrão/externa (no-op sem segredo)
+      closeDrawer();
+      try { if (("#" + name) !== location.hash) history.replaceState(null, "", "#" + name); } catch (e) {}
+      var main = document.querySelector(".main");
+      if (main) window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+    }
+    Array.prototype.slice.call(document.querySelectorAll(".nav-item[data-nav]")).forEach(function (b) {
+      b.addEventListener("click", function () { showView(b.getAttribute("data-nav")); });
+    });
+    window.addEventListener("hashchange", function () {
+      var h = (location.hash || "").replace("#", "");
+      if (VIEWS[h]) showView(h);
+    });
+
+    // ---- Drawer mobile ----------------------------------------------------------
+    function openDrawer() { $("sidebar").classList.add("open"); $("scrim").classList.add("show"); }
+    function closeDrawer() { $("sidebar").classList.remove("open"); $("scrim").classList.remove("show"); }
+    $("btnMenu").addEventListener("click", openDrawer);
+    $("scrim").addEventListener("click", closeDrawer);
+
+    // Todas as APIs conhecidas e suas familias (roteia por igualdade de tipo; evogo ANTES de evo).
+    var API_LIST = ["evolution", "evogo", "wuzapi", "waha", "uazapi"];
+    var API_LABEL = { evolution: "Evolution API", evogo: "Evolution Go", wuzapi: "WuzAPI", waha: "WAHA", uazapi: "UAZAPI" };
+    var FAMILY = { evolution: "baileys", waha: "baileys", evogo: "whatsmeow", wuzapi: "whatsmeow", uazapi: "whatsmeow" };
+    var EXPORT_ONLY_DEST = { uazapi: true }; // destino-only (nunca origem)
+    // Cor por API (só visual: trilho/avatar/badge dos cartões de sessão).
+    var API_COLOR = { evolution: "#10b981", evogo: "#14b8a6", wuzapi: "#6366f1", waha: "#3b82f6", uazapi: "#f59e0b" };
+    function apiColor(api) { return API_COLOR[api] || "#71717a"; }
+    // hex -> "r,g,b" (para compor cores translucidas inline)
+    function hexRgb(hex) {
+      var h = String(hex || "").replace("#", "");
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      var n = parseInt(h, 16);
+      return ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255);
+    }
+    // Variaveis CSS por API para um elemento (cor solida + soft + border + ink).
+    function apiVars(api) {
+      var c = apiColor(api), rgb = hexRgb(c);
+      return "--api-color:" + c + ";--api-soft:rgba(" + rgb + ",.12);--api-border:rgba(" + rgb + ",.35);--api-ink:" + c + ";";
+    }
+
+    var state = {
+      secret: "",         // memoria + localStorage (wa-hub-secret)
+      health: null,
+      sessions: [],       // [{api,id,name,number,jid,status,connected}]
+      hist: [],           // historico local {t,conn,total} p/ sparkline (so nesta aba)
+      lastSessionsJson: "", // p/ o auto-refresh so re-renderizar a lista quando mudar
+      qrTimer: null,
+      qrCtx: null,
+      migCtx: null,       // { from:{api,id,number,name}, ... }
+      migBusy: false,     // true enquanto POST /migrate esta em andamento (trava o fechamento)
+      migTimer: null,     // interval do cronometro de migracao
+      sendCtx: null,      // sessao alvo do modal "Testar envio"
+      configCtx: null     // { api } alvo do modal "Configurar API"
+    };
+
+    function familyOf(api) { return FAMILY[api] || "?"; }
+
+    // ---- HTTP helper (mesma origem) --------------------------------------------
+    function headers() {
+      return { "Content-Type": "application/json", "x-hub-secret": state.secret };
+    }
+    function callApi(method, path, body) {
+      return fetch(path, {
+        method: method,
+        headers: headers(),
+        body: body != null ? JSON.stringify(body) : undefined
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          return { ok: res.ok, status: res.status, data: data || {} };
+        });
+      }).catch(function (e) {
+        return { ok: false, status: 0, data: { error: (e && e.message) || "rede" } };
+      });
+    }
+    // Traduz erros comuns em mensagem PT.
+    function errMessage(r, kind) {
+      var code = (r.data && (r.data.code || r.data.error)) || "";
+      if (r.status === 401) return "Segredo do hub inválido (401).";
+      if (r.status === 501) {
+        return kind === "export"
+          ? "Esta API não suporta export (destino-only)."
+          : "Operação não suportada por esta API (501).";
+      }
+      if (r.status === 409) {
+        var c = String(code || "").toUpperCase();
+        var extra = c && c !== "TRUE" ? " [" + c + "]" : "";
+        return "Conflito (409)" + extra + ". Possíveis causas: sessão travada (LOCKED) ou número já conectado noutra API (NUMBER_ALREADY_CONNECTED).";
+      }
+      if (r.status === 0) return "Falha de rede ao falar com o broker.";
+      var msg = (r.data && (r.data.error || r.data.message)) || ("HTTP " + r.status);
+      if (r.data && r.data.detail) { try { msg += " — " + (typeof r.data.detail === "string" ? r.data.detail : JSON.stringify(r.data.detail)); } catch (e) {} }
+      return msg;
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+      });
+    }
+    function toast(msg, kind) {
+      kind = kind || "err";
+      var el = document.createElement("div");
+      el.className = "globalerr " + kind;
+      var ic = kind === "ok" ? "check" : kind === "warn" ? "alert" : kind === "info" ? "info" : "x";
+      el.innerHTML = icon(ic) + '<span></span>';
+      el.querySelector("span").textContent = msg;
+      $("globalErr").innerHTML = "";
+      $("globalErr").appendChild(el);
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 6000);
+    }
+    function requireSecret() {
+      if (!state.secret) {
+        toast("Informe o segredo do hub primeiro.", "warn");
+        showView("overview");
+        $("secret").focus();
+        return false;
+      }
+      return true;
+    }
+
+    // ---- Modal de confirmacao (substitui window.confirm) -----------------------
+    // Retorna Promise<boolean>. Reusa o overlay/modal existentes.
+    function confirmModal(opts) {
+      opts = opts || {};
+      return new Promise(function (resolve) {
+        $("cfmTitle").textContent = opts.title || "Confirmar";
+        $("cfmMessage").textContent = opts.message || "";
+        var okBtn = $("cfmOk");
+        okBtn.textContent = opts.okText || "Confirmar";
+        okBtn.className = "btn " + (opts.danger ? "danger" : "primary");
+        $("cfmCancel").textContent = opts.cancelText || "Cancelar";
+        var overlay = $("cfmOverlay");
+        var done = false;
+        function cleanup(val) {
+          if (done) return; done = true;
+          overlay.classList.add("hidden");
+          okBtn.removeEventListener("click", onOk);
+          $("cfmCancel").removeEventListener("click", onCancel);
+          $("cfmClose").removeEventListener("click", onCancel);
+          overlay.removeEventListener("click", onBg);
+          document.removeEventListener("keydown", onKey);
+          resolve(val);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        function onBg(e) { if (e.target === overlay) cleanup(false); }
+        function onKey(e) { if (e.key === "Escape") cleanup(false); else if (e.key === "Enter") cleanup(true); }
+        okBtn.addEventListener("click", onOk);
+        $("cfmCancel").addEventListener("click", onCancel);
+        $("cfmClose").addEventListener("click", onCancel);
+        overlay.addEventListener("click", onBg);
+        document.addEventListener("keydown", onKey);
+        overlay.classList.remove("hidden");
+        setTimeout(function () { okBtn.focus(); }, 0);
+      });
+    }
+
+    // ---- Segredo ---------------------------------------------------------------
+    // Persistido em localStorage (pedido do Pedro): restaura no load e auto-conecta,
+    // sem exigir redigitar a cada refresh. Apagar o campo = esquecer o segredo salvo.
+    var SECRET_LS_KEY = "wa-hub-secret";
+    function saveSecret(v) {
+      try { if (v) localStorage.setItem(SECRET_LS_KEY, v); else localStorage.removeItem(SECRET_LS_KEY); } catch (e) {}
+    }
+    function loadSavedSecret() {
+      try { return localStorage.getItem(SECRET_LS_KEY) || ""; } catch (e) { return ""; }
+    }
+    $("btnEye").innerHTML = icon("eye");
+    $("btnEye").addEventListener("click", function () {
+      var f = $("secret");
+      var show = f.type === "password";
+      f.type = show ? "text" : "password";
+      $("btnEye").innerHTML = icon(show ? "eye-off" : "eye");
+    });
+    $("secret").addEventListener("input", function () {
+      state.secret = $("secret").value.trim();
+      if (!state.secret) saveSecret(""); // campo apagado = esquecer o salvo
+    });
+    $("secret").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnConnect").click(); });
+
+    $("btnConnect").addEventListener("click", function () {
+      state.secret = $("secret").value.trim();
+      if (!requireSecret()) return;
+      saveSecret(state.secret);
+      loadHealth();
+      loadSessions();
+      showView("sessions");
+    });
+
+    // ---- /health ---------------------------------------------------------------
+    function loadHealth() {
+      // /health nao exige segredo, mas mandamos mesmo assim (inofensivo).
+      fetch("/health", { headers: { "x-hub-secret": state.secret } })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (h) {
+          state.health = h || {};
+          $("dotHealth").className = "dot " + (h && h.ok ? "on" : "warn");
+          $("healthLabel").textContent = h && h.ok ? "broker ok" : "broker respondeu (ok=false)";
+          renderHealthApis(h);
+        })
+        .catch(function () {
+          state.health = null;
+          $("dotHealth").className = "dot off";
+          $("healthLabel").textContent = "broker inacessível";
+          $("healthApis").textContent = "APIs: —";
+        });
+    }
+    // apis pode vir como array de nomes, array de objetos {name/api, up/connected/ok}, ou objeto {evolution:true,...}
+    function healthApiSet(h) {
+      var up = {};
+      if (!h) return up;
+      var apis = h.apis;
+      if (Array.isArray(apis)) {
+        apis.forEach(function (it) {
+          if (typeof it === "string") { up[it] = true; }
+          else if (it && typeof it === "object") {
+            var nm = it.api || it.name || it.id;
+            var on = ("up" in it) ? it.up : ("connected" in it) ? it.connected : ("ok" in it) ? it.ok : true;
+            if (nm) up[nm] = !!on;
+          }
+        });
+      } else if (apis && typeof apis === "object") {
+        Object.keys(apis).forEach(function (k) {
+          var v = apis[k];
+          up[k] = (v && typeof v === "object") ? !!(v.up || v.connected || v.ok) : !!v;
+        });
+      }
+      return up;
+    }
+    function renderHealthApis(h) {
+      var up = healthApiSet(h);
+      var keys = Object.keys(up);
+      if (!keys.length) { $("healthApis").textContent = "APIs: —"; return; }
+      var box = $("healthBadges");
+      Array.prototype.slice.call(box.querySelectorAll("[data-apibadge]")).forEach(function (n) { n.remove(); });
+      keys.forEach(function (k) {
+        var span = document.createElement("span");
+        span.className = "badge";
+        span.setAttribute("data-apibadge", "1");
+        span.innerHTML = '<span class="dot ' + (up[k] ? "on" : "off") + '"></span> ' + escapeHtml(API_LABEL[k] || k);
+        box.appendChild(span);
+      });
+      var onCount = keys.filter(function (k) { return up[k]; }).length;
+      $("healthApis").textContent = "APIs ligadas: " + onCount + "/" + keys.length;
+      updateKpis();
+    }
+
+    // ---- KPIs (so leitura; derivados de state.sessions + state.health) ---------
+    function updateKpis() {
+      var list = state.sessions || [];
+      $("kpiTotal").textContent = list.length ? String(list.length) : "0";
+      var conn = list.filter(function (s) { return !!s.connected; }).length;
+      $("kpiConnected").textContent = list.length ? String(conn) : "0";
+
+      var up = healthApiSet(state.health);
+      var keys = Object.keys(up);
+      var onKeys = keys.filter(function (k) { return up[k]; });
+      $("kpiApisNum").textContent = keys.length ? (onKeys.length + " / " + keys.length) : "—";
+      var box = $("kpiApisList");
+      box.innerHTML = "";
+      if (!keys.length) {
+        box.innerHTML = '<span class="chip neutral">consulte /health</span>';
+        return;
+      }
+      keys.forEach(function (k) {
+        var span = document.createElement("span");
+        span.className = "chip " + (up[k] ? "ok" : "neutral");
+        span.innerHTML = '<span class="dot ' + (up[k] ? "on" : "off") + '"></span>' + escapeHtml(API_LABEL[k] || k);
+        box.appendChild(span);
+      });
+    }
+
+    // ---- /sessions -------------------------------------------------------------
+    $("btnReloadSessions").addEventListener("click", function () { if (requireSecret()) loadSessions(); });
+
+    function bannerHtml(kind, inner) {
+      var ic = kind === "ok" ? "check" : kind === "warn" ? "alert" : kind === "err" ? "x" : "info";
+      return '<div class="banner ' + kind + '">' + icon(ic) + '<div>' + inner + '</div></div>';
+    }
+
+    function loadSessions() {
+      if (!requireSecret()) return;
+      $("sessionsArea").innerHTML = bannerHtml("info", "Carregando sessões...");
+      callApi("GET", "/sessions").then(function (r) {
+        if (!r.ok) {
+          $("sessionsArea").innerHTML = bannerHtml("err", escapeHtml(errMessage(r)));
+          if (r.status === 401) toast("Segredo do hub inválido.", "err");
+          return;
+        }
+        var list = (r.data && r.data.sessions) || [];
+        state.sessions = list;
+        state.lastSessionsJson = JSON.stringify(list);
+        renderSessions(list);
+        pushHist(list);
+        updateKpis();
+        renderKpiSpark();
+        renderApiMix();
+        // atualiza selects de sessao que dependem da lista
+        refreshPasteSessions();
+      });
+    }
+
+    // ---- histórico local + sparkline + mix (gráficos SVG à mão, ref. oauth-hub) --
+    function pushHist(list) {
+      var conn = (list || []).filter(function (s) { return !!s.connected; }).length;
+      state.hist.push({ t: Date.now(), conn: conn, total: (list || []).length });
+      if (state.hist.length > 120) state.hist.shift(); // ~30 min de amostras a cada 15s
+    }
+    function svgSpark(vals, w, h) {
+      if (!vals || vals.length < 2) return "";
+      var max = Math.max.apply(null, vals.concat([1]));
+      var pts = vals.map(function (v, i) {
+        var x = (i / (vals.length - 1)) * w;
+        var y = h - (v / max) * (h - 4) - 2;
+        return [x, y];
+      });
+      var line = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join("");
+      var area = line + "L" + w + " " + h + "L0 " + h + "Z";
+      return '<svg class="chart-svg" viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="' + h + '" preserveAspectRatio="none">' +
+        '<path class="spark-area" d="' + area + '"/><path class="spark-line" d="' + line + '"/></svg>';
+    }
+    function renderKpiSpark() {
+      var box = $("kpiConnSpark");
+      if (!box) return;
+      box.innerHTML = svgSpark(state.hist.map(function (x) { return x.conn; }), 220, 30);
+    }
+    function renderApiMix() {
+      var box = $("apiMix");
+      if (!box) return;
+      var list = state.sessions || [];
+      if (!list.length) {
+        box.innerHTML = '<div class="hint" style="margin-top:0">Sem sessões ainda — conecte para ver a distribuição.</div>';
+        return;
+      }
+      var by = {};
+      list.forEach(function (s) {
+        if (!by[s.api]) by[s.api] = { total: 0, conn: 0 };
+        by[s.api].total += 1;
+        if (s.connected) by[s.api].conn += 1;
+      });
+      var max = 1;
+      Object.keys(by).forEach(function (a) { if (by[a].total > max) max = by[a].total; });
+      var html = "";
+      API_LIST.concat(Object.keys(by).filter(function (a) { return API_LIST.indexOf(a) < 0; })).forEach(function (a) {
+        var d = by[a];
+        if (!d || !d.total) return;
+        var pctT = Math.round((d.total / max) * 100);
+        var pctC = Math.round((d.conn / max) * 100);
+        html += '<div class="mixrow">' +
+          '<span class="mixlbl">' + escapeHtml(API_LABEL[a] || a) + '</span>' +
+          '<span class="mixbar">' +
+            '<span class="mixfill" style="width:' + pctT + '%;background:' + apiColor(a) + '4d"></span>' +
+            '<span class="mixfill" style="width:' + pctC + '%;background:' + apiColor(a) + '"></span>' +
+          '</span>' +
+          '<span class="mixnum tnum">' + d.conn + '/' + d.total + '</span>' +
+        '</div>';
+      });
+      box.innerHTML = html || '<div class="hint" style="margin-top:0">—</div>';
+    }
+
+    // ---- auto-refresh silencioso (15s): KPIs/gráficos sempre; lista só se mudou --
+    setInterval(function () {
+      if (!state.secret || document.hidden) return;
+      loadHealth();
+      callApi("GET", "/sessions").then(function (r) {
+        if (!r.ok || !r.data || !Array.isArray(r.data.sessions)) return;
+        var js = JSON.stringify(r.data.sessions);
+        state.sessions = r.data.sessions;
+        pushHist(state.sessions);
+        updateKpis();
+        renderKpiSpark();
+        renderApiMix();
+        if (js !== state.lastSessionsJson) {
+          state.lastSessionsJson = js;
+          renderSessions(state.sessions);
+          refreshPasteSessions();
+        }
+      });
+    }, 15000);
+
+    function statusChip(s) {
+      var st = String(s.status || "").toUpperCase();
+      var connected = !!s.connected;
+      var cls = connected ? "ok" : (st.indexOf("QR") >= 0 || st === "SCAN_QR_CODE" || st === "STARTING" || st === "CONNECTING") ? "warn" : "neutral";
+      var label = s.status || (connected ? "CONNECTED" : "—");
+      var dotCls = connected ? "dot live" : "dot off";
+      return '<span class="st"><span class="' + dotCls + '"></span><span class="chip ' + cls + '">' + escapeHtml(label) + '</span></span>';
+    }
+
+    function renderSessions(list) {
+      if (!list.length) {
+        $("sessionsArea").innerHTML = bannerHtml("warn", "Nenhuma sessão encontrada nas APIs configuradas.");
+        return;
+      }
+      // agrupa por numero (mesma conta em varias APIs). Sem numero => grupo proprio no fim.
+      var groups = {};
+      var order = [];
+      list.forEach(function (s, idx) {
+        var key = s.number ? String(s.number) : ("__none_" + idx);
+        if (!groups[key]) { groups[key] = []; order.push(key); }
+        groups[key].push(s);
+      });
+      // grupos com numero e mais de 1 membro primeiro (destaque do dedup)
+      order.sort(function (a, b) {
+        var ga = groups[a], gb = groups[b];
+        var ma = (a.indexOf("__none_") === 0) ? 0 : ga.length;
+        var mb = (b.indexOf("__none_") === 0) ? 0 : gb.length;
+        if (mb !== ma) return mb - ma;
+        return 0;
+      });
+
+      var html = '<div class="sesslist">';
+
+      order.forEach(function (key) {
+        var members = groups[key];
+        var isRealGroup = key.indexOf("__none_") !== 0;
+        var multi = isRealGroup && members.length > 1;
+
+        html += '<div class="sessgroup' + (multi ? ' multi' : '') + '">';
+        if (multi) {
+          html += '<div class="sessgroup-head">' +
+            '<span class="numgroup"><span class="gnum">' + escapeHtml(members[0].number || "—") + '</span>' +
+            ' <span class="numbadge">' + members.length + ' APIs</span></span>' +
+          '</div>';
+        }
+
+        members.forEach(function (s, i) {
+          var label = API_LABEL[s.api] || s.api;
+          var initial = escapeHtml(String(label).charAt(0) || "?");
+          var isOrigin = !EXPORT_ONLY_DEST[s.api];
+          var migBtn = isOrigin
+            ? '<button class="btn sm" data-mig="' + i + '">' + icon("migrate") + 'Migrar</button>'
+            : '<button class="btn sm" disabled title="UAZAPI é destino-only">' + icon("migrate") + 'Migrar</button>';
+          // numero: mostra na 2a linha (em grupo multi ja aparece no cabecalho)
+          var numHtml = (s.number && !multi)
+            ? '<span class="numcell">' + escapeHtml(s.number) + '</span>'
+            : (s.number ? '' : '<span class="numcell muted">&mdash;</span>');
+          html += '<div class="sessrow" data-idx-api="' + escapeHtml(s.api) + '" data-idx-id="' + escapeHtml(s.id) + '" style="' + apiVars(s.api) + '">' +
+            '<span class="sess-av">' + initial + '</span>' +
+            '<div class="sess-main">' +
+              '<div class="sess-l1">' +
+                '<span class="sess-name">' + escapeHtml(s.name || "—") + '</span>' +
+                '<span class="apitag">' + escapeHtml(label) + '</span>' +
+              '</div>' +
+              '<div class="sess-l2">' +
+                (numHtml ? numHtml : '') +
+                statusChip(s) +
+              '</div>' +
+            '</div>' +
+            '<div class="sess-actions"><div class="rowbtns">' +
+              '<button class="btn sm" data-qr="1">' + icon("qr-code") + 'Ler QR</button>' +
+              '<button class="btn sm" data-send="1">' + icon("send") + 'Testar</button>' +
+              '<button class="btn sm" data-disc="1">' + icon("power") + 'Desconectar</button>' +
+              migBtn +
+              '<button class="btn sm danger" data-del="1">' + icon("trash") + 'Excluir</button>' +
+            '</div></div>' +
+          '</div>';
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+      $("sessionsArea").innerHTML = html;
+
+      // liga acoes por linha
+      Array.prototype.slice.call($("sessionsArea").querySelectorAll("[data-idx-api]")).forEach(function (tr) {
+        var api = tr.getAttribute("data-idx-api");
+        var id = tr.getAttribute("data-idx-id");
+        var sess = findSession(api, id);
+        var qb = tr.querySelector("[data-qr]");
+        if (qb) qb.addEventListener("click", function () { openQr(sess); });
+        var sb = tr.querySelector("[data-send]");
+        if (sb) sb.addEventListener("click", function () { openSend(sess); });
+        var xb = tr.querySelector("[data-disc]");
+        if (xb) xb.addEventListener("click", function () { disconnectSession(sess); });
+        var mb = tr.querySelector("[data-mig]:not([disabled])");
+        if (mb) mb.addEventListener("click", function () { openMigrate(sess); });
+        var db = tr.querySelector("[data-del]");
+        if (db) db.addEventListener("click", function () { deleteSession(sess); });
+      });
+    }
+    function findSession(api, id) {
+      for (var i = 0; i < state.sessions.length; i++) {
+        if (state.sessions[i].api === api && String(state.sessions[i].id) === String(id)) return state.sessions[i];
+      }
+      return { api: api, id: id };
+    }
+
+    // ---- Desconectar sessao ----------------------------------------------------
+    // So para a conexao (mantem sessao/creds -> reconecta com Ler QR/Regenerar).
+    // Reversivel: nao pede confirmacao.
+    function disconnectSession(sess) {
+      if (!requireSecret()) return;
+      var path = "/" + encodeURIComponent(sess.api) + "/disconnect?id=" + encodeURIComponent(sess.id);
+      callApi("POST", path).then(function (r) {
+        if (!r.ok) {
+          var msg = r.status === 501 ? "Esta API não suporta desconectar." : errMessage(r);
+          toast(msg, r.status === 401 ? "err" : "warn");
+          return;
+        }
+        toast("Sessão desconectada.", "ok");
+        // mudanca de estado na API pode ser assincrona: recarrega ja e de novo ~1.2s depois
+        loadSessions();
+        setTimeout(loadSessions, 1200);
+      });
+    }
+
+    // ---- Excluir sessao --------------------------------------------------------
+    function deleteSession(sess) {
+      if (!requireSecret()) return;
+      var apiLabel = API_LABEL[sess.api] || sess.api;
+      confirmModal({
+        title: "Excluir sessão",
+        message: "Excluir a sessão \"" + (sess.name || sess.id) + "\" da API " + apiLabel + "? Isso remove a sessão dessa API.",
+        okText: "Excluir",
+        danger: true
+      }).then(function (ok) {
+        if (!ok) return;
+        var path = "/" + encodeURIComponent(sess.api) + "/session?id=" + encodeURIComponent(sess.id);
+        callApi("DELETE", path).then(function (r) {
+          if (!r.ok) {
+            var msg = r.status === 501 ? "Esta API não suporta excluir." : errMessage(r);
+            toast(msg, r.status === 401 ? "err" : "warn");
+            return;
+          }
+          toast("Sessão excluída.", "ok");
+          // remocao na API pode ser assincrona: recarrega ja e de novo ~1.2s depois
+          loadSessions();
+          setTimeout(loadSessions, 1200);
+        });
+      });
+    }
+
+    // ---- Modal: Ler QR ---------------------------------------------------------
+    function normalizeQrSrc(qr) {
+      if (!qr) return null;
+      qr = String(qr);
+      if (qr.indexOf("data:") === 0) return qr;              // ja e data:image/...
+      if (/^https?:\/\//i.test(qr)) return qr;               // url de imagem
+      return "data:image/png;base64," + qr;                  // base64 puro
+    }
+    function stopQrPolling() {
+      if (state.qrTimer) { clearTimeout(state.qrTimer); state.qrTimer = null; }
+    }
+    // Mostra a imagem do QR sobre fundo branco solido (classe hasimg no holder).
+    function showQrImage(src) {
+      $("qrImgHolder").className = "hasimg";
+      $("qrImgHolder").innerHTML = '<img class="qrimg" alt="QR code" src="' + escapeHtml(src) + '" />';
+    }
+    function showQrEmpty(html, extraStyle) {
+      $("qrImgHolder").className = "";
+      $("qrImgHolder").innerHTML = '<div class="qrimg-empty"' + (extraStyle ? ' style="' + extraStyle + '"' : "") + '>' + html + '</div>';
+    }
+    function openQr(sess) {
+      if (!requireSecret()) return;
+      state.qrCtx = sess;
+      $("qrSub").textContent = (API_LABEL[sess.api] || sess.api) + " · " + (sess.name || sess.id);
+      showQrEmpty("Aguardando QR...");
+      $("qrPairWrap").className = "hidden";
+      $("qrStatus").innerHTML = '<span class="chip neutral">iniciando...</span>';
+      $("btnQrRegen").disabled = false;
+      $("btnQrRegen").textContent = "Regenerar QR";
+      $("qrOverlay").classList.remove("hidden");
+      pollQr();
+    }
+    function closeQr() {
+      stopQrPolling();
+      state.qrCtx = null;
+      $("qrOverlay").classList.add("hidden");
+      // recarrega a lista ao fechar (reflete sessoes recem-criadas/conectadas)
+      if (state.secret) setTimeout(loadSessions, 300);
+    }
+    $("qrClose").addEventListener("click", closeQr);
+    $("qrOverlay").addEventListener("click", function (e) { if (e.target === $("qrOverlay")) closeQr(); });
+
+    // Regenerar QR: forca a sessao a gerar um novo QR e re-dispara o polling.
+    $("btnQrRegen").addEventListener("click", function () {
+      var sess = state.qrCtx;
+      if (!sess || !requireSecret()) return;
+      $("btnQrRegen").disabled = true;
+      $("btnQrRegen").textContent = "Regenerando...";
+      $("qrStatus").innerHTML = '<span class="chip neutral">regenerando...</span>';
+      var path = "/" + encodeURIComponent(sess.api) + "/restart?id=" + encodeURIComponent(sess.id);
+      callApi("POST", path).then(function (r) {
+        if (!state.qrCtx || state.qrCtx !== sess) return; // modal fechado/trocado
+        $("btnQrRegen").disabled = false;
+        $("btnQrRegen").textContent = "Regenerar QR";
+        if (!r.ok) {
+          var msg = r.status === 501 ? "Esta API não suporta regenerar." : errMessage(r);
+          $("qrStatus").innerHTML = '<span class="chip bad">' + escapeHtml(msg) + '</span>';
+          if (r.status === 401) { stopQrPolling(); toast("Segredo do hub inválido.", "err"); }
+          return;
+        }
+        // re-dispara o fetch/polling do QR imediatamente
+        stopQrPolling();
+        showQrEmpty("Aguardando QR...");
+        $("qrPairWrap").className = "hidden";
+        pollQr();
+      });
+    });
+
+    function pollQr() {
+      var sess = state.qrCtx;
+      if (!sess) return;
+      var path = "/" + encodeURIComponent(sess.api) + "/qr?id=" + encodeURIComponent(sess.id);
+      callApi("GET", path).then(function (r) {
+        if (!state.qrCtx || state.qrCtx !== sess) return; // modal fechado/trocado
+        if (!r.ok) {
+          $("qrStatus").innerHTML = '<span class="chip bad">' + escapeHtml(errMessage(r)) + '</span>';
+          if (r.status === 401) { stopQrPolling(); return; }
+          state.qrTimer = setTimeout(pollQr, 3000);
+          return;
+        }
+        var d = r.data || {};
+        var connected = !!d.connected;
+        var st = String(d.status || (connected ? "CONNECTED" : "")).toUpperCase();
+
+        if (connected || st === "OPEN" || st === "WORKING" || st === "CONNECTED") {
+          // conectou: fecha o modal automaticamente, avisa e recarrega a lista
+          stopQrPolling();
+          $("qrPairWrap").className = "hidden";
+          toast("Conectado.", "ok");
+          closeQr(); // ja dispara loadSessions
+          return;
+        }
+
+        var src = normalizeQrSrc(d.qr);
+        var hasImg = !!src;
+        // A string "code" so e codigo de pareamento quando NAO ha imagem de QR e for
+        // curta (<=12). O evo/evogo/waha mandam a string CRUA do QR em code -> ocultar.
+        var code = d.code != null ? String(d.code) : "";
+        var isPairCode = code && code.length <= 12;
+        if (src) {
+          showQrImage(src);
+        } else if (!$("qrImgHolder").querySelector("img")) {
+          showQrEmpty(isPairCode ? "Use o código de pareamento abaixo." : "Aguardando QR...");
+        } else {
+          hasImg = true; // ja tem uma imagem renderizada de um poll anterior
+        }
+        if (!hasImg && isPairCode) {
+          $("qrPair").textContent = code;
+          $("qrPairWrap").className = "";
+        } else {
+          $("qrPairWrap").className = "hidden";
+        }
+        var label = d.status || "SCAN_QR_CODE";
+        var cls = st === "PASSKEY" ? "bad" : "warn";
+        $("qrStatus").innerHTML = '<span class="chip ' + cls + '">' + escapeHtml(label) + '</span>';
+        state.qrTimer = setTimeout(pollQr, 3000);
+      });
+    }
+
+    // ---- Modal: Migrar ---------------------------------------------------------
+    function fillApiSelect(sel, opts) {
+      opts = opts || {};
+      sel.innerHTML = "";
+      API_LIST.forEach(function (api) {
+        if (opts.excludeDestOnly && EXPORT_ONLY_DEST[api] && opts.role === "origin") return;
+        var o = document.createElement("option");
+        o.value = api;
+        o.textContent = API_LABEL[api];
+        sel.appendChild(o);
+      });
+      if (opts.value) sel.value = opts.value;
+    }
+
+    function openMigrate(sess) {
+      if (!requireSecret()) return;
+      if (EXPORT_ONLY_DEST[sess.api]) { toast("UAZAPI é destino-only (não pode ser origem).", "warn"); return; }
+      state.migCtx = { from: sess };
+      $("migSub").textContent = "de " + (API_LABEL[sess.api] || sess.api);
+      $("migFrom").innerHTML = icon("migrate") + '<div>' +
+        '<b>' + escapeHtml(API_LABEL[sess.api] || sess.api) + '</b> · ' +
+        escapeHtml(sess.name || sess.id) +
+        (sess.number ? ' · <span class="numcell">' + escapeHtml(sess.number) + '</span>' : "") +
+        ' <span class="muted">(família: ' + escapeHtml(familyOf(sess.api)) + ')</span></div>';
+
+      // destino: default = uma API diferente da origem
+      var defDest = API_LIST.filter(function (a) { return a !== sess.api; })[0] || sess.api;
+      fillApiSelect($("migToApi"), { value: defDest });
+
+      // reset campos
+      $("migDestExisting").checked = true;
+      $("migDestNew").checked = false;
+      $("migToName").value = "";
+      $("migToName").disabled = true;
+      $("migTier2").checked = false;
+      $("migCleanup").checked = false;
+      $("migWebhook").value = "";
+      $("migSteps").innerHTML = "";
+      $("migResult").innerHTML = "";
+      $("btnMigStart").disabled = false;
+      $("btnMigStart").textContent = "Migrar";
+      // garante estado destravado ao (re)abrir
+      stopMigTimer();
+      state.migBusy = false;
+      $("migClose").disabled = false;
+
+      updateTierAvailability();
+      loadMigDestSessions();
+
+      $("migOverlay").classList.remove("hidden");
+    }
+    function closeMigrate() {
+      if (state.migBusy) return; // trava o fechamento durante a migracao em andamento
+      state.migCtx = null;
+      $("migOverlay").classList.add("hidden");
+    }
+    $("migClose").addEventListener("click", closeMigrate);
+    $("migOverlay").addEventListener("click", function (e) { if (e.target === $("migOverlay")) closeMigrate(); });
+    // Esc nao fecha o modal de Migrar enquanto ocupado (defesa; hoje ja nao ha Esc-close aqui).
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && state.migBusy && !$("migOverlay").classList.contains("hidden")) {
+        e.stopPropagation();
+      }
+    }, true);
+
+    $("migToApi").addEventListener("change", function () { updateTierAvailability(); loadMigDestSessions(); });
+    $("btnMigReloadDest").addEventListener("click", loadMigDestSessions);
+
+    function destMode() { return $("migDestNew").checked ? "new" : "existing"; }
+    Array.prototype.slice.call(document.getElementsByName("migDest")).forEach(function (r) {
+      r.addEventListener("change", function () {
+        var isNew = destMode() === "new";
+        $("migToName").disabled = !isNew;
+        $("migToSession").disabled = isNew;
+        if (isNew) $("migToName").focus();
+      });
+    });
+
+    // Tier 2 so habilita se origem e destino sao mesma familia.
+    function updateTierAvailability() {
+      var from = state.migCtx && state.migCtx.from;
+      if (!from) return;
+      var toApi = $("migToApi").value;
+      var same = familyOf(from.api) === familyOf(toApi);
+      var wrap = $("tierToggleWrap");
+      $("migTier2").disabled = !same;
+      if (!same) {
+        $("migTier2").checked = false;
+        wrap.classList.add("disabled");
+        $("tierNote").textContent = "Tier 2 só entre motores da mesma família (baileys<->baileys ou whatsmeow<->whatsmeow). Origem: " + familyOf(from.api) + " · Destino: " + familyOf(toApi) + ".";
+      } else {
+        wrap.classList.remove("disabled");
+        $("tierNote").textContent = "Copia também as chaves de sessão (migração quente). Habilitado: ambos são " + familyOf(toApi) + ".";
+      }
+    }
+
+    function loadMigDestSessions() {
+      var toApi = $("migToApi").value;
+      var sel = $("migToSession");
+      sel.innerHTML = '<option value="">— carregando... —</option>';
+      // filtra a lista em memoria pela API destino; se vazia, oferece so "criar nova".
+      var opts = state.sessions.filter(function (s) { return s.api === toApi; });
+      // opcional: recarrega do backend para refletir criacoes recentes
+      callApi("GET", "/sessions").then(function (r) {
+        if (r.ok && r.data && r.data.sessions) {
+          state.sessions = r.data.sessions;
+          opts = state.sessions.filter(function (s) { return s.api === toApi; });
+        }
+        sel.innerHTML = "";
+        if (!opts.length) {
+          sel.innerHTML = '<option value="">nenhuma sessão nesta API — use "Criar nova"</option>';
+        } else {
+          opts.forEach(function (s) {
+            var o = document.createElement("option");
+            o.value = s.id;
+            o.textContent = (s.name || s.id) + (s.connected ? " [conectada]" : "") + (s.number ? " · " + s.number : "");
+            sel.appendChild(o);
+          });
+        }
+      });
+    }
+
+    // Mensagem de erro de migracao: prioriza o codigo/mensagem do body, com textos PT.
+    function migErrMessage(r, d) {
+      d = d || (r && r.data) || {};
+      var code = String(d.error || d.code || "").toUpperCase();
+      var map = {
+        SOURCE_NOT_READY: "origem sem sessão; conecte a origem primeiro.",
+        SOURCE_EXPORT_UNSUPPORTED: "a API de origem não suporta export (destino-only).",
+        BAD_REQUEST: "requisição inválida (verifique origem e destino).",
+        LOCKED: "sessão travada (LOCKED); tente novamente em instantes.",
+        NUMBER_ALREADY_CONNECTED: "o número já está conectado noutra API.",
+        MIGRATE_FAILED: "falha na migração."
+      };
+      if (map[code]) return map[code] + (d.message && String(d.message) !== code ? " — " + d.message : "");
+      // sem codigo mapeado: usa message do body ou o tradutor generico
+      if (d.message) return String(d.message);
+      return errMessage(r);
+    }
+
+    // Coage qualquer valor a texto legivel (evita "[object Object]" nos steps).
+    function asText(v) {
+      if (v == null) return "";
+      if (typeof v === "string") return v;
+      if (typeof v === "number" || typeof v === "boolean") return String(v);
+      try { return JSON.stringify(v); } catch (e) { return String(v); }
+    }
+    function migStep(kind, title, detail) {
+      var ic = kind === "ok" ? "check" : kind === "bad" ? "x" : kind === "warn" ? "alert" : "dot";
+      var col = kind === "ok" ? "hsl(var(--success))" : kind === "bad" ? "hsl(var(--destructive))" : kind === "warn" ? "hsl(var(--warning))" : "hsl(var(--info))";
+      var box = $("migSteps");
+      if (!box.querySelector(".steps")) box.innerHTML = '<div class="steps"></div>';
+      var el = document.createElement("div");
+      el.className = "step";
+      var dt = asText(detail);
+      el.innerHTML = '<div class="ic" style="color:' + col + '">' + icon(ic) + '</div>' +
+        '<div class="tx">' + escapeHtml(asText(title)) + (dt ? '<small>' + escapeHtml(dt) + '</small>' : "") + '</div>';
+      box.querySelector(".steps").appendChild(el);
+    }
+
+    // Cronometro da migracao: mostra "Migrando... Ns" com spinner + barra indeterminada.
+    function startMigTimer() {
+      stopMigTimer();
+      var t0 = Date.now();
+      function render() {
+        var sec = Math.floor((Date.now() - t0) / 1000);
+        var el = $("migLoadSec");
+        if (el) el.textContent = sec + "s";
+      }
+      $("migSteps").innerHTML =
+        '<div class="migload">' +
+          '<div class="spinner"></div>' +
+          '<div class="mltx"><b>Migrando... <span class="mlsec" id="migLoadSec">0s</span></b>' +
+          '<small>Transferindo a identidade. Conectar no destino pode levar até ~1-2 min.</small></div>' +
+        '</div>' +
+        '<div class="indet"></div>';
+      render();
+      state.migTimer = setInterval(render, 1000);
+    }
+    function stopMigTimer() {
+      if (state.migTimer) { clearInterval(state.migTimer); state.migTimer = null; }
+    }
+
+    $("btnMigStart").addEventListener("click", function () {
+      var ctx = state.migCtx;
+      if (!ctx || !requireSecret()) return;
+      if (state.migBusy) return; // bloqueia segundo submit
+      var from = ctx.from;
+      var toApi = $("migToApi").value;
+      var to = { api: toApi };
+      if (destMode() === "new") {
+        var nm = $("migToName").value.trim();
+        if (!nm) { $("migToName").focus(); toast("Informe o nome da nova sessão de destino.", "warn"); return; }
+        to.name = nm;
+      } else {
+        var did = $("migToSession").value;
+        if (!did) { toast("Escolha a sessão de destino ou use \"Criar nova\".", "warn"); return; }
+        to.id = did;
+      }
+
+      var body = {
+        from: { api: from.api, id: from.id },
+        to: to,
+        tier: $("migTier2").checked && !$("migTier2").disabled ? 2 : 1,
+        cleanup: !!$("migCleanup").checked
+      };
+      var wh = $("migWebhook").value.trim();
+      if (wh) body.webhookUrl = wh;
+
+      $("migSteps").innerHTML = "";
+      $("migResult").innerHTML = "";
+      // entra em estado ocupado: trava o fechamento, desabilita o X e o botao, liga o cronometro
+      state.migBusy = true;
+      $("migClose").disabled = true;
+      $("btnMigStart").disabled = true;
+      $("btnMigStart").textContent = "Migrando...";
+      startMigTimer();
+
+      callApi("POST", "/migrate", body).then(function (r) {
+        // resposta chegou: para o cronometro, libera fechamento e botao
+        stopMigTimer();
+        state.migBusy = false;
+        $("migClose").disabled = false;
+        $("btnMigStart").disabled = false;
+        $("btnMigStart").textContent = "Migrar";
+
+        // steps do backend (array completo ao final; detalhes ja vem como texto legivel)
+        var steps = (r.data && r.data.steps) || [];
+        $("migSteps").innerHTML = "";
+        migStep("info", "Migração (Tier " + body.tier + ")", (API_LABEL[from.api] || from.api) + " -> " + (API_LABEL[toApi] || toApi));
+        steps.forEach(function (s) {
+          var ok = s.ok === undefined ? true : !!s.ok;
+          migStep(ok ? "ok" : "bad", s.step || "passo", s.detail || "");
+        });
+
+        var d = r.data || {};
+        if (!r.ok || !d.success) {
+          var mm = migErrMessage(r, d);
+          $("migResult").innerHTML = bannerHtml("err", "Migração falhou: " + escapeHtml(mm));
+          // encerra o estado e reflete a lista mesmo em erro
+          setTimeout(loadSessions, 600);
+          return;
+        }
+        // sucesso
+        var destId = (d.to && d.to.id) || to.id || to.name;
+        var destNum = (d.to && d.to.number) || (d.jid ? String(d.jid).split(/[:@]/)[0] : "");
+        var jidLine = d.jid ? (' · JID: ' + escapeHtml(d.jid)) : "";
+        if (d.connected) {
+          $("migResult").innerHTML = bannerHtml("ok", "Migrado e conectado." + jidLine);
+          toast("Migrado e conectado.", "ok");
+          // atalho: testar o envio ja na sessao de destino
+          if (destId) {
+            var destSess = { api: toApi, id: destId, name: to.name || destId, number: destNum, connected: true };
+            var btn = document.createElement("button");
+            btn.className = "primary";
+            btn.style.marginTop = "10px";
+            btn.innerHTML = icon("send") + 'Testar envio no destino';
+            btn.addEventListener("click", function () { openSend(destSess); });
+            $("migResult").appendChild(btn);
+          }
+        } else {
+          $("migResult").innerHTML = bannerHtml("warn", "Importado no destino; conectando (pode levar ~1-2 min) — veja o status na lista." + jidLine);
+          toast("Importado no destino; conectando...", "warn");
+        }
+        setTimeout(loadSessions, 600);
+      });
+    });
+
+    // ---- Colar passaporte ------------------------------------------------------
+    fillApiSelect($("pasteApi"), { value: "evogo" });
+    $("pasteApi").addEventListener("change", refreshPasteSessions);
+    $("btnPasteReload").addEventListener("click", refreshPasteSessions);
+    $("pasteJson").addEventListener("input", validatePaste);
+
+    function validatePaste() {
+      var chip = $("pasteChip");
+      var raw = $("pasteJson").value.trim();
+      if (!raw) { chip.className = "chip neutral"; chip.textContent = "aguardando passaporte"; return null; }
+      var obj;
+      try { obj = JSON.parse(raw); } catch (e) { chip.className = "chip bad"; chip.textContent = "JSON inválido"; return null; }
+      if (obj && obj.creds && typeof obj.creds === "object") obj = obj.creds; // export completo
+      var miss = [];
+      if (!obj || typeof obj !== "object") { chip.className = "chip bad"; chip.textContent = "não é objeto"; return null; }
+      if (!obj.noiseKey || !obj.noiseKey.private) miss.push("noiseKey");
+      if (!obj.signedIdentityKey || !obj.signedIdentityKey.private) miss.push("identityKey");
+      if (!obj.signedPreKey) miss.push("signedPreKey");
+      if (obj.registrationId == null) miss.push("registrationId");
+      if (!obj.me || !obj.me.id) miss.push("me.id");
+      if (miss.length) { chip.className = "chip warn"; chip.textContent = "faltando: " + miss.join(", "); return obj; }
+      chip.className = "chip ok";
+      var who = obj.me && obj.me.id ? " · " + String(obj.me.id).split(/[:@]/)[0] : "";
+      chip.textContent = "passaporte ok" + who;
+      return obj;
+    }
+
+    function refreshPasteSessions() {
+      var api = $("pasteApi").value;
+      var sel = $("pasteSessionSel");
+      var opts = (state.sessions || []).filter(function (s) { return s.api === api; });
+      sel.innerHTML = '<option value="">— sessão existente —</option>';
+      opts.forEach(function (s) {
+        var o = document.createElement("option");
+        o.value = s.id;
+        o.textContent = (s.name || s.id) + (s.number ? " · " + s.number : "");
+        sel.appendChild(o);
+      });
+    }
+
+    $("btnPasteImport").addEventListener("click", function () {
+      if (!requireSecret()) return;
+      var obj = validatePaste();
+      if (!obj) { toast("Cole um passaporte JSON válido.", "warn"); return; }
+      var api = $("pasteApi").value;
+      var newName = $("pasteNewName").value.trim();
+      var existingId = $("pasteSessionSel").value;
+
+      $("pasteResult").innerHTML = "";
+      var chain;
+      if (existingId) {
+        chain = Promise.resolve({ id: existingId });
+      } else if (newName) {
+        // cria a sessao primeiro
+        $("pasteResult").innerHTML = bannerHtml("info", 'Criando sessão "' + escapeHtml(newName) + '"...');
+        chain = callApi("POST", "/" + encodeURIComponent(api) + "/create", { name: newName }).then(function (r) {
+          if (!r.ok) throw { r: r, phase: "create" };
+          return { id: (r.data && r.data.id) || newName };
+        });
+      } else {
+        toast("Escolha uma sessão existente ou informe o nome de uma nova.", "warn");
+        return;
+      }
+
+      $("btnPasteImport").disabled = true; $("btnPasteImport").textContent = "Importando...";
+      chain.then(function (target) {
+        $("pasteResult").innerHTML = bannerHtml("info", "Importando passaporte na sessão " + escapeHtml(target.id) + "...");
+        return callApi("POST", "/" + encodeURIComponent(api) + "/import", { id: target.id, passport: obj });
+      }).then(function (r) {
+        $("btnPasteImport").disabled = false; $("btnPasteImport").textContent = "Importar passaporte";
+        if (!r.ok) { $("pasteResult").innerHTML = bannerHtml("err", escapeHtml(errMessage(r, "import"))); return; }
+        var d = r.data || {};
+        var jidLine = d.jid ? (" · JID: " + d.jid) : "";
+        $("pasteResult").innerHTML = bannerHtml("ok", "Passaporte importado." + escapeHtml(jidLine));
+        setTimeout(loadSessions, 600);
+      }).catch(function (err) {
+        $("btnPasteImport").disabled = false; $("btnPasteImport").textContent = "Importar passaporte";
+        if (err && err.r) { $("pasteResult").innerHTML = bannerHtml("err", "Falha ao criar sessão: " + escapeHtml(errMessage(err.r))); }
+        else { $("pasteResult").innerHTML = bannerHtml("err", "Erro: " + escapeHtml((err && err.message) || "desconhecido")); }
+      });
+    });
+
+    // ---- Modal: Nova sessao (QR) -----------------------------------------------
+    // Popula o select preferindo as APIs que o /health reporta ligadas; se nenhuma
+    // info de health, mostra a lista completa. Todas as APIs (inclui UAZAPI) podem
+    // criar sessao + parear por QR.
+    function fillNewApiSelect() {
+      var sel = $("newApi");
+      var prev = sel.value;
+      var up = healthApiSet(state.health);
+      var upKeys = API_LIST.filter(function (a) { return up[a]; });
+      var keys = upKeys.length ? upKeys : API_LIST.slice();
+      sel.innerHTML = "";
+      keys.forEach(function (api) {
+        var o = document.createElement("option");
+        o.value = api;
+        o.textContent = API_LABEL[api] || api;
+        sel.appendChild(o);
+      });
+      // as APIs offline vao pro fim, marcadas, pra nao travar caso o health esteja defasado
+      if (upKeys.length && upKeys.length < API_LIST.length) {
+        API_LIST.filter(function (a) { return !up[a]; }).forEach(function (api) {
+          var o = document.createElement("option");
+          o.value = api;
+          o.textContent = (API_LABEL[api] || api) + " (offline)";
+          sel.appendChild(o);
+        });
+      }
+      if (prev && sel.querySelector('option[value="' + prev + '"]')) sel.value = prev;
+      updateNewApiHint();
+    }
+    function updateNewApiHint() {
+      var api = $("newApi").value;
+      $("newApiHint").textContent = "Família: " + familyOf(api) +
+        (EXPORT_ONLY_DEST[api] ? " · destino-only para migração, mas cria+pareia por QR normalmente." : "");
+    }
+    function openNewSession() {
+      if (!requireSecret()) return;
+      fillNewApiSelect();
+      $("newName").value = "";
+      $("newResult").innerHTML = "";
+      $("btnNewCreate").disabled = false;
+      $("btnNewCreate").textContent = "Criar e ler QR";
+      $("newOverlay").classList.remove("hidden");
+      setTimeout(function () { $("newName").focus(); }, 0);
+    }
+    function closeNewSession() {
+      $("newOverlay").classList.add("hidden");
+    }
+    $("btnNewSession").addEventListener("click", openNewSession);
+    $("navNewSession").addEventListener("click", function () { closeDrawer(); openNewSession(); });
+    $("newClose").addEventListener("click", closeNewSession);
+    $("newOverlay").addEventListener("click", function (e) { if (e.target === $("newOverlay")) closeNewSession(); });
+    $("newApi").addEventListener("change", updateNewApiHint);
+    $("newName").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnNewCreate").click(); });
+
+    $("btnNewCreate").addEventListener("click", function () {
+      if (!requireSecret()) return;
+      var api = $("newApi").value;
+      var name = $("newName").value.trim();
+      if (!name) { $("newName").focus(); toast("Informe o nome da sessão.", "warn"); return; }
+
+      $("newResult").innerHTML = bannerHtml("info", 'Criando sessão "' + escapeHtml(name) + '" em ' + escapeHtml(API_LABEL[api] || api) + '...');
+      $("btnNewCreate").disabled = true;
+      $("btnNewCreate").textContent = "Criando...";
+
+      callApi("POST", "/" + encodeURIComponent(api) + "/create", { name: name }).then(function (r) {
+        $("btnNewCreate").disabled = false;
+        $("btnNewCreate").textContent = "Criar e ler QR";
+        if (!r.ok) {
+          $("newResult").innerHTML = bannerHtml("err", escapeHtml(errMessage(r)));
+          if (r.status === 401) toast("Segredo do hub inválido.", "err");
+          return;
+        }
+        var d = r.data || {};
+        // resposta esperada { id, name }; Evolution: id == name. Fallback pro nome digitado.
+        var id = (d.id != null && d.id !== "") ? d.id : name;
+        var sess = { api: api, id: id, name: d.name || name };
+        $("newResult").innerHTML = bannerHtml("ok", "Sessão criada. Abrindo QR...");
+        closeNewSession();
+        // reusa o modal de QR + polling existente (mesma funcao do botao "Ler QR")
+        openQr(sess);
+        // reflete a nova sessao na lista assim que possivel
+        setTimeout(loadSessions, 600);
+      });
+    });
+
+    // ---- Modal: Testar envio ---------------------------------------------------
+    // Envia um texto de teste pela sessao (POST /:api/send). Disponivel em todas as
+    // APIs, inclusive UAZAPI (uazapi so nao pode ser ORIGEM de migracao; enviar OK).
+    function openSend(sess) {
+      if (!requireSecret()) return;
+      state.sendCtx = sess;
+      $("sendSub").textContent = (API_LABEL[sess.api] || sess.api) + " · " + (sess.name || sess.id);
+      $("sendFrom").innerHTML = icon("send") + '<div>' +
+        '<b>' + escapeHtml(API_LABEL[sess.api] || sess.api) + '</b> · ' +
+        escapeHtml(sess.name || sess.id) +
+        (sess.number ? ' · <span class="numcell">' + escapeHtml(sess.number) + '</span>' : "") +
+        (sess.connected ? ' <span class="chip ok">conectada</span>' : ' <span class="chip neutral">status ?</span>') + '</div>';
+      $("sendTo").value = "";
+      $("sendText").value = "teste hub";
+      $("sendResult").innerHTML = "";
+      $("btnSendGo").disabled = false;
+      $("btnSendGo").textContent = "Enviar";
+      $("sendOverlay").classList.remove("hidden");
+      setTimeout(function () { $("sendTo").focus(); }, 0);
+    }
+    function closeSend() {
+      state.sendCtx = null;
+      $("sendOverlay").classList.add("hidden");
+    }
+    $("sendClose").addEventListener("click", closeSend);
+    $("sendOverlay").addEventListener("click", function (e) { if (e.target === $("sendOverlay")) closeSend(); });
+    $("sendTo").addEventListener("keydown", function (e) { if (e.key === "Enter") $("sendText").focus(); });
+    $("sendText").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnSendGo").click(); });
+
+    $("btnSendGo").addEventListener("click", function () {
+      var sess = state.sendCtx;
+      if (!sess || !requireSecret()) return;
+      var to = $("sendTo").value.replace(/[^0-9]/g, "");
+      var text = $("sendText").value;
+      if (!to) { $("sendTo").focus(); toast("Informe o número de destino (só dígitos).", "warn"); return; }
+      if (!text || !text.trim()) { $("sendText").focus(); toast("Informe a mensagem.", "warn"); return; }
+
+      $("sendResult").innerHTML = bannerHtml("info", "Enviando para " + escapeHtml(to) + "...");
+      $("btnSendGo").disabled = true;
+      $("btnSendGo").textContent = "Enviando...";
+
+      callApi("POST", "/" + encodeURIComponent(sess.api) + "/send", { id: sess.id, to: to, text: text }).then(function (r) {
+        if (!state.sendCtx || state.sendCtx !== sess) return; // modal fechado/trocado
+        $("btnSendGo").disabled = false;
+        $("btnSendGo").textContent = "Enviar";
+        if (!r.ok) {
+          var msg = r.status === 501 ? "Esta API não suporta envio." : errMessage(r);
+          $("sendResult").innerHTML = bannerHtml("err", escapeHtml(msg));
+          if (r.status === 401) toast("Segredo do hub inválido.", "err");
+          return;
+        }
+        var d = r.data || {};
+        var idLine = d.messageId ? (' · id: ' + escapeHtml(String(d.messageId))) : "";
+        $("sendResult").innerHTML = bannerHtml("ok", "Enviado" + idLine);
+      });
+    });
+
+    // ---- Configurações: grade de APIs ------------------------------------------
+    // Cada card abre o modal generico de config (openConfig). O botao da UAZAPI
+    // mantem o id btnConfigUazapi (compat com o fluxo original).
+    function renderCfgGrid() {
+      var grid = $("cfgGrid");
+      var html = "";
+      API_LIST.forEach(function (api) {
+        var label = API_LABEL[api] || api;
+        var initial = escapeHtml(String(label).charAt(0) || "?");
+        var idAttr = api === "uazapi" ? ' id="btnConfigUazapi"' : "";
+        html += '<div class="cfgcard">' +
+          '<div class="h">' +
+            '<span class="av" style="background:' + apiColor(api) + '">' + initial + '</span>' +
+            '<div><div class="nm">' + escapeHtml(label) + '</div><div class="fam">família ' + escapeHtml(familyOf(api)) + (EXPORT_ONLY_DEST[api] ? " · destino-only" : "") + '</div></div>' +
+          '</div>' +
+          '<div class="act row" style="justify-content:space-between; align-items:center">' +
+            '<span class="chip neutral" data-cfgmode="' + escapeHtml(api) + '">&mdash;</span>' +
+            '<button class="btn sm" data-cfg="' + escapeHtml(api) + '"' + idAttr + '>' + icon("settings") + 'Configurar</button>' +
+          '</div>' +
+        '</div>';
+      });
+      grid.innerHTML = html;
+      Array.prototype.slice.call(grid.querySelectorAll("[data-cfg]")).forEach(function (b) {
+        b.addEventListener("click", function () { openConfig(b.getAttribute("data-cfg")); });
+      });
+    }
+
+    // Badge por card: padrão da stack | externa/custom | desligada (via GET /config).
+    function refreshCfgModes() {
+      if (!state.secret) return;
+      callApi("GET", "/config").then(function (r) {
+        if (!r.ok || !r.data || !r.data.config) return;
+        Object.keys(r.data.config).forEach(function (api) {
+          var el = document.querySelector('[data-cfgmode="' + api + '"]');
+          if (!el) return;
+          var c = r.data.config[api];
+          if (!c.enabled) { el.className = "chip neutral"; el.textContent = "desligada"; }
+          else if (c.custom) { el.className = "chip warn"; el.textContent = "externa/custom"; }
+          else { el.className = "chip ok"; el.textContent = "padrão da stack"; }
+        });
+      });
+    }
+
+    // ---- Modal: Configurar API (host + token + DSNs p/ instalação externa) -----
+    var UAZAPI_DEFAULT_URL = "https://api.uazapi.com";
+    // Campos avançados por API. `secret:true` = URI com senha (vem MASCARADA do GET
+    // /config → nunca pré-preencher o value; vazio mantém o salvo).
+    var CFG_EXTRA = {
+      evolution: {
+        warn: "Instalação externa: preencha também o DSN do Postgres — trocar só a URL mistura a API externa com o banco da stack. O banco precisa estar acessível a partir do container do broker (ex.: host.docker.internal).",
+        fields: [
+          { k: "databaseUri", lbl: "Postgres DSN (obrigatório p/ migração)", ph: "postgresql://user:senha@host:5432/evolution_db?sslmode=disable", secret: true },
+          { k: "dbSchema", lbl: "Schema do banco", ph: "evolution_api" },
+          { k: "redisUri", lbl: "Redis URI (opcional — Tier 2)", ph: "redis://host:6379/6", secret: true }
+        ]
+      },
+      evogo: {
+        warn: "Instalação externa: preencha também os DOIS DSNs do Postgres (auth + users) — trocar só a URL mistura a API externa com os bancos da stack.",
+        fields: [
+          { k: "authDatabaseUri", lbl: "Postgres DSN auth (whatsmeow_device)", ph: "postgresql://user:senha@host:5432/evogo_auth?sslmode=disable", secret: true },
+          { k: "usersDatabaseUri", lbl: "Postgres DSN users (instances)", ph: "postgresql://user:senha@host:5432/evogo_users?sslmode=disable", secret: true }
+        ]
+      },
+      wuzapi: {
+        warn: "Instalação externa: o DSN é usado no export e no import via SQL (upstream). Fork zpro como DESTINO funciona só com URL+token (import nativo).",
+        fields: [
+          { k: "databaseUri", lbl: "Postgres DSN (export/import SQL)", ph: "postgresql://user:senha@host:5432/wuzapi?sslmode=disable", secret: true },
+          { k: "importMode", lbl: "Modo de import", type: "select", opts: ["auto", "native", "sql"] }
+        ]
+      },
+      waha: {
+        warn: "Import/export de passaporte exigem o diretório .sessions da WAHA montado no container do broker (WAHA externa: listar/QR/enviar funcionam; passaporte não, sem o volume).",
+        fields: [
+          { k: "sessionsDir", lbl: "Diretório .sessions (montado no broker)", ph: "/waha-sessions" }
+        ]
+      },
+      uazapi: { warn: null, fields: [] }
+    };
+    function buildCfgExtras(api, cfgFields) {
+      var def = CFG_EXTRA[api] || { fields: [] };
+      var box = $("cfgExtraFields");
+      if (!def.fields.length) { box.innerHTML = ""; return; }
+      var html = '<div class="sep"></div><div class="panel-sub">Instalação externa (avançado)</div>';
+      if (def.warn) html += '<div class="hint" style="margin:6px 0 2px">' + escapeHtml(def.warn) + '</div>';
+      def.fields.forEach(function (f) {
+        var v = (cfgFields && cfgFields[f.k]) || "";
+        html += '<div class="field"><label>' + escapeHtml(f.lbl) + '</label>';
+        if (f.type === "select") {
+          html += '<select data-cfgkey="' + f.k + '">' + f.opts.map(function (o) {
+            return '<option value="' + o + '"' + (v === o ? " selected" : "") + '>' + o + '</option>';
+          }).join("") + '</select>';
+        } else if (f.secret) {
+          var ph = v ? (v + " (deixe vazio p/ manter)") : (f.ph || "");
+          html += '<input type="text" data-cfgkey="' + f.k + '" placeholder="' + escapeHtml(ph) + '" autocomplete="off" />';
+        } else {
+          html += '<input type="text" data-cfgkey="' + f.k + '" value="' + escapeHtml(v) + '" placeholder="' + escapeHtml(f.ph || "") + '" autocomplete="off" />';
+        }
+        html += '</div>';
+      });
+      box.innerHTML = html;
+    }
+    $("cfgTokenEye").innerHTML = icon("eye");
+    $("cfgTokenEye").addEventListener("click", function () {
+      var f = $("cfgToken");
+      var show = f.type === "password";
+      f.type = show ? "text" : "password";
+      $("cfgTokenEye").innerHTML = icon(show ? "eye-off" : "eye");
+    });
+    function openConfig(api) {
+      if (!requireSecret()) return;
+      state.configCtx = { api: api };
+      var label = API_LABEL[api] || api;
+      $("cfgTitle").textContent = "Configurar " + label;
+      $("cfgSub").textContent = "Padrão = instalação da stack. Preencha p/ apontar a " + label + " para outra instalação; a config persiste no broker.";
+      $("cfgUrl").value = api === "uazapi" ? UAZAPI_DEFAULT_URL : "";
+      $("cfgToken").value = "";
+      $("cfgToken").type = "password";
+      $("cfgTokenEye").innerHTML = icon("eye");
+      $("cfgToken").placeholder = "cole o admin token";
+      $("cfgTokenHint").textContent = "O token é enviado só quando você digita um novo.";
+      $("cfgWebhook").value = "";
+      buildCfgExtras(api, null);
+      $("cfgResult").innerHTML = "";
+      $("btnCfgSave").disabled = false;
+      $("btnCfgSave").textContent = "Salvar";
+      $("cfgOverlay").classList.remove("hidden");
+      // prefill via GET /config (nao sobrescreve o token; DSNs mascarados viram placeholder)
+      callApi("GET", "/config").then(function (r) {
+        if (!state.configCtx || state.configCtx.api !== api) return;
+        var cfg = (r.ok && r.data && r.data.config && r.data.config[api]) || null;
+        if (!cfg) return;
+        if (cfg.apiUrl) $("cfgUrl").value = cfg.apiUrl;
+        if (cfg.webhookUrl) $("cfgWebhook").value = cfg.webhookUrl;
+        if (cfg.hasSecret) {
+          $("cfgToken").placeholder = cfg.secretMasked ? (cfg.secretMasked + " (deixe vazio p/ manter)") : "token já salvo (deixe vazio p/ manter)";
+          $("cfgTokenHint").textContent = "Já existe um token salvo. Deixe vazio para manter; digite para substituir.";
+        }
+        buildCfgExtras(api, cfg.fields || null);
+      });
+      setTimeout(function () { $("cfgUrl").focus(); }, 0);
+    }
+    function closeConfig() {
+      state.configCtx = null;
+      $("cfgOverlay").classList.add("hidden");
+    }
+    $("cfgClose").addEventListener("click", closeConfig);
+    $("cfgOverlay").addEventListener("click", function (e) { if (e.target === $("cfgOverlay")) closeConfig(); });
+
+    $("btnCfgSave").addEventListener("click", function () {
+      var ctx = state.configCtx;
+      if (!ctx || !requireSecret()) return;
+      var api = ctx.api;
+      var apiUrl = $("cfgUrl").value.trim();
+      var token = $("cfgToken").value;
+      var webhook = $("cfgWebhook").value.trim();
+      if (!apiUrl) { $("cfgUrl").focus(); toast("Informe a URL da API.", "warn"); return; }
+
+      var body = { apiUrl: apiUrl, webhookUrl: webhook };
+      if (token && token.trim()) body.adminToken = token; // so envia se digitou algo novo
+      // campos avançados (instalação externa): só os preenchidos (vazio mantém o salvo)
+      Array.prototype.slice.call($("cfgExtraFields").querySelectorAll("[data-cfgkey]")).forEach(function (el) {
+        var v = (el.value || "").trim();
+        if (v) body[el.getAttribute("data-cfgkey")] = v;
+      });
+
+      $("cfgResult").innerHTML = bannerHtml("info", "Salvando configuração...");
+      $("btnCfgSave").disabled = true;
+      $("btnCfgSave").textContent = "Salvando...";
+
+      callApi("POST", "/config/" + encodeURIComponent(api), body).then(function (r) {
+        if (!state.configCtx || state.configCtx.api !== api) return;
+        $("btnCfgSave").disabled = false;
+        $("btnCfgSave").textContent = "Salvar";
+        if (!r.ok) {
+          var msg = r.status === 400 ? "Faltam campos (URL + token)." : errMessage(r);
+          $("cfgResult").innerHTML = bannerHtml("err", escapeHtml(msg));
+          if (r.status === 401) toast("Segredo do hub inválido.", "err");
+          return;
+        }
+        $("cfgResult").innerHTML = bannerHtml("ok", escapeHtml((API_LABEL[api] || api)) + " configurada.");
+        toast((API_LABEL[api] || api) + " configurada.", "ok");
+        closeConfig();
+        // recarrega health + sessoes + badges: a api passa a aparecer ligada
+        loadHealth();
+        refreshCfgModes();
+        if (state.secret) loadSessions();
+      });
+    });
+
+    // Restaurar padrão da stack: descarta a config runtime persistida da API.
+    $("btnCfgReset").addEventListener("click", function () {
+      var ctx = state.configCtx;
+      if (!ctx || !requireSecret()) return;
+      var api = ctx.api;
+      confirmModal({
+        title: "Restaurar padrão da stack",
+        message: "Descartar a configuração runtime de " + (API_LABEL[api] || api) + " e voltar ao padrão do .env da stack?",
+        okText: "Restaurar"
+      }).then(function (ok) {
+        if (!ok) return;
+        $("btnCfgReset").disabled = true;
+        callApi("POST", "/config/" + encodeURIComponent(api), { reset: true }).then(function (r) {
+          $("btnCfgReset").disabled = false;
+          if (!state.configCtx || state.configCtx.api !== api) return;
+          if (!r.ok) {
+            $("cfgResult").innerHTML = bannerHtml("err", escapeHtml(errMessage(r)));
+            return;
+          }
+          toast((API_LABEL[api] || api) + " restaurada ao padrão da stack.", "ok");
+          closeConfig();
+          loadHealth();
+          refreshCfgModes();
+          if (state.secret) loadSessions();
+        });
+      });
+    });
+
+    // ---- init ------------------------------------------------------------------
+    renderCfgGrid();
+    // restaura o segredo salvo ANTES de decidir a view/carregar dados (auto-conecta).
+    (function initSecret() {
+      var saved = loadSavedSecret();
+      if (saved) {
+        $("secret").value = saved;
+        state.secret = saved;
+      }
+    })();
+    loadHealth();
+    validatePaste();
+    if (state.secret) loadSessions();
+    (function initView() {
+      var h = (location.hash || "").replace("#", "");
+      // com segredo salvo e sem hash, ja abre direto em Sessoes (mesmo destino do Conectar)
+      showView(VIEWS[h] ? h : (state.secret ? "sessions" : "overview"));
+    })();
+  </script>
+</body>
+</html>

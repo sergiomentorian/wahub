@@ -1,0 +1,19 @@
+# ── segredos e config local ────────────────────────────────────────────────────
+.env
+runtime-config.json
+broker/runtime-config.json
+
+# ── documentação interna de planejamento (não publicar) ───────────────────────
+PLANO_HUB_APIS.md
+
+# ── node ───────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── sistema operacional / editor ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
