@@ -78,6 +78,14 @@ function readNumber(obj) {
   return '';
 }
 
+function isSuccessfulEvolutionResponse(response) {
+  return Boolean(
+    response &&
+      response.ok &&
+      !(response.data && typeof response.data === 'object' && response.data.error === true)
+  );
+}
+
 module.exports = {
   id: 'evolution',
   family: 'baileys',
@@ -258,18 +266,28 @@ module.exports = {
 
     // Sobe a sessao ao vivo (sem QR). Se a instancia JA estava rodando/ciclando QR, o
     // /instance/connect NAO relê as creds do banco → forcamos um RESTART (recarrega o auth
-    // do DB com as creds injetadas e conecta). Fallback: connect.
+    // do DB com as creds injetadas e conecta). A Evolution responde HTTP 200 mesmo quando
+    // o controller devolve { error:true }; nesse caso o restart NAO ocorreu e precisamos
+    // chamar /connect para criar o cliente lendo as credenciais novas do banco.
+    let restart = null;
     try {
-      const rs = await util.httpJson('POST', `${ctx.apiUrl}/instance/restart/${encodeURIComponent(name)}`, { apikey: ctx.apiKey });
-      if (!rs.ok) {
-        await util.httpJson('GET', `${ctx.apiUrl}/instance/connect/${encodeURIComponent(name)}`, { apikey: ctx.apiKey });
-      }
-    } catch (e) {
-      util.errlog(`[evolution] import restart/connect falhou name=${name} (creds gravadas): ${(e && e.message) || e}`);
+      restart = await util.httpJson('POST', `${ctx.apiUrl}/instance/restart/${encodeURIComponent(name)}`, { apikey: ctx.apiKey });
+    } catch (error) {
+      util.errlog(`[evolution] import restart falhou name=${name}; tentando connect: ${(error && error.message) || error}`);
+    }
+    if (!isSuccessfulEvolutionResponse(restart)) {
+      let connect = null;
       try {
-        await util.httpJson('GET', `${ctx.apiUrl}/instance/connect/${encodeURIComponent(name)}`, { apikey: ctx.apiKey });
-      } catch (_e) {
-        /* creds gravadas; sobem no proximo restart */
+        connect = await util.httpJson('GET', `${ctx.apiUrl}/instance/connect/${encodeURIComponent(name)}`, { apikey: ctx.apiKey });
+      } catch (error) {
+        throw new passport.CredsError(
+          'CONNECT_FAILED',
+          `Evolution não iniciou a sessão importada: ${(error && error.message) || error}`
+        );
+      }
+      if (!isSuccessfulEvolutionResponse(connect)) {
+        const detail = connect && connect.data ? JSON.stringify(connect.data) : `HTTP ${connect && connect.status}`;
+        throw new passport.CredsError('CONNECT_FAILED', `Evolution não iniciou a sessão importada: ${detail}`);
       }
     }
 

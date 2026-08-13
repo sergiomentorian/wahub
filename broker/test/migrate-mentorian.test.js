@@ -124,6 +124,13 @@ test('Mentorian to Evolution registers the webhook and commits after connection'
   ]);
 });
 
+test('Evolution destinations receive a longer readiness window', () => {
+  assert.equal(migrate.destinationReadyTimeoutMs('waha', 'evolution'), 75000);
+  assert.equal(migrate.destinationReadyTimeoutMs('mentorian', 'evolution'), 90000);
+  assert.equal(migrate.destinationReadyTimeoutMs('waha', 'mentorian'), 90000);
+  assert.equal(migrate.destinationReadyTimeoutMs('evolution', 'waha'), 25000);
+});
+
 test('Mentorian source is restored when WAHA import fails', async () => {
   const fixture = registryFor({ importFailure: true });
 

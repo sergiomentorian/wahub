@@ -63,6 +63,17 @@ const STATUS_BY_CODE = {
 const locks = new Set();
 const MENTORIAN_SOURCE_READY_TIMEOUT_MS = 20000;
 const MENTORIAN_SOURCE_READY_INTERVAL_MS = 1000;
+const DEFAULT_DESTINATION_READY_TIMEOUT_MS = 25000;
+const EVOLUTION_DESTINATION_READY_TIMEOUT_MS = 75000;
+const MENTORIAN_DESTINATION_READY_TIMEOUT_MS = 90000;
+
+function destinationReadyTimeoutMs(fromApi, toApi) {
+  if (fromApi === 'mentorian' || toApi === 'mentorian') {
+    return MENTORIAN_DESTINATION_READY_TIMEOUT_MS;
+  }
+  if (toApi === 'evolution') return EVOLUTION_DESTINATION_READY_TIMEOUT_MS;
+  return DEFAULT_DESTINATION_READY_TIMEOUT_MS;
+}
 
 // Resolve uma entry do registry por id EXATO (evogo != evo — nunca includes).
 function resolveEntry(registry, api) {
@@ -369,7 +380,7 @@ async function run(registry, body) {
     const ok = await util.pollUntil(
       () => toAdapter.status(toCtx, toId),
       (s) => s && s.connected,
-      { timeoutMs: from.api === 'mentorian' ? 90000 : 25000, intervalMs: 3000 }
+      { timeoutMs: destinationReadyTimeoutMs(from.api, to.api), intervalMs: 3000 }
     );
     const connected = !!(ok && ok.connected);
     push('verify', connected ? 'destino conectado' : 'destino não confirmou conexão');
@@ -447,4 +458,5 @@ module.exports = {
   MigrateError,
   locks,
   exportMentorianSourceWhenReady,
+  destinationReadyTimeoutMs,
 };
