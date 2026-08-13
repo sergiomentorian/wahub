@@ -1,0 +1,34 @@
+{$GATEWAY_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	handle /wahub-broker/health {
+		uri strip_prefix /wahub-broker
+		reverse_proxy wa-hub-broker-1:8090
+	}
+
+	handle /wahub-broker/* {
+		@mentorian_app header X-Hub-Edge-Secret {$WAHUB_EDGE_SECRET}
+		handle @mentorian_app {
+			uri strip_prefix /wahub-broker
+			reverse_proxy wa-hub-broker-1:8090
+		}
+		respond "Not Found" 404
+	}
+
+	handle {
+		reverse_proxy whatsapp-baileys-gateway:8787
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
