@@ -25,7 +25,7 @@ function passportFixture() {
   };
 }
 
-function registryFor({ importFailure = false, releaseFailure = false, webhookFailure = false } = {}) {
+function registryFor({ importFailure = false, releaseFailure = false, webhookFailure = false, destinationId = 'waha' } = {}) {
   const calls = [];
   let released = false;
   const source = {
@@ -81,7 +81,7 @@ function registryFor({ importFailure = false, releaseFailure = false, webhookFai
     calls,
     registry: {
       mentorian: { adapter: source, ctx: {} },
-      waha: { adapter: destination, ctx: {} },
+      [destinationId]: { adapter: destination, ctx: {} },
     },
   };
 }
@@ -100,6 +100,26 @@ test('Mentorian to WAHA commits only after destination confirms connected', asyn
     'create-destination',
     'release-source',
     'import-destination',
+    'commit-source',
+  ]);
+});
+
+test('Mentorian to Evolution registers the webhook and commits after connection', async () => {
+  const fixture = registryFor({ destinationId: 'evolution' });
+  const result = await migrate.run(fixture.registry, {
+    from: { api: 'mentorian', id: 'workspace-123' },
+    to: { api: 'evolution', name: 'workspace-123' },
+    webhook: { url: 'https://app.example.test/api/webhooks/whatsapp/evolution', secret: 'x'.repeat(64) },
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.to.api, 'evolution');
+  assert.deepEqual(fixture.calls, [
+    'export',
+    'create-destination',
+    'release-source',
+    'import-destination',
+    'webhook-destination',
     'commit-source',
   ]);
 });

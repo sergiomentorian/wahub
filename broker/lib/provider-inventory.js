@@ -4,18 +4,21 @@ const fs = require('fs');
 const path = require('path');
 
 const WAHA_RELEASES_URL = 'https://api.github.com/repos/devlikeapro/waha/releases/latest';
+const EVOLUTION_RELEASES_URL = 'https://api.github.com/repos/evolution-foundation/evolution-api/releases/latest';
 const LATEST_CACHE_MS = 30 * 60 * 1000;
 let wahaLatestCache = null;
+let evolutionLatestCache = null;
 
 async function buildProviderInventory({ registry, env = process.env, fetchImpl = fetch, now = new Date() }) {
   const generatedAt = now.toISOString();
   const configDir = env.BROKER_CONFIG_DIR || path.join(__dirname, '..');
   const releaseState = readProviderReleaseState(configDir);
-  const [baileys, waha] = await Promise.all([
+  const [baileys, waha, evolution] = await Promise.all([
     buildBaileysProvider(registry.mentorian, generatedAt),
     buildWahaProvider(registry.waha, env, fetchImpl, generatedAt, releaseState.waha),
+    buildEvolutionProvider(registry.evolution, env, fetchImpl, generatedAt, releaseState.evolution),
   ]);
-  const providers = [baileys, waha];
+  const providers = [baileys, waha, evolution];
   persistObservedVersions(providers, configDir, generatedAt);
   const history = readVersionHistory(configDir);
 
@@ -28,6 +31,56 @@ async function buildProviderInventory({ registry, env = process.env, fetchImpl =
         ? { ...provider.package, history: history[provider.id] || provider.package.history || [] }
         : null,
     })),
+  };
+}
+
+async function buildEvolutionProvider(entry, env, fetchImpl, generatedAt, releaseState = null) {
+  let readiness = null;
+  try {
+    readiness = entry && typeof entry.adapter.readiness === 'function'
+      ? await entry.adapter.readiness(entry.ctx)
+      : null;
+  } catch (_error) {
+    readiness = null;
+  }
+  const installedVersion = String(
+    releaseState?.installedVersion || env.EVOLUTION_VERSION || env.EVO_VERSION || '2.3.7',
+  ).replace(/^v/, '');
+  const official = await readLatestEvolutionVersion({ env, fetchImpl, now: new Date(generatedAt) });
+  const latestVersion = official.version;
+  const status = !latestVersion
+    ? 'check_failed'
+    : latestVersion === installedVersion
+      ? 'up_to_date'
+      : 'update_available';
+  return {
+    id: 'evolution',
+    name: 'Evolution API',
+    family: 'Evolution / Baileys',
+    online: readiness?.ok === true,
+    readyForUse: true,
+    deployment: 'Docker VPS',
+    gatewayVersion: readiness?.version || `v${installedVersion}`,
+    package: {
+      installedVersion,
+      latestVersion,
+      status,
+      releaseChannel: String(releaseState?.releaseChannel || env.EVOLUTION_RELEASE_CHANNEL || 'stable'),
+      prerelease: false,
+      automaticUpdates:
+        releaseState?.automaticUpdates === true || env.EVOLUTION_AUTOMATIC_UPDATES === 'true',
+      lastCheckedAt: official.checkedAt,
+      lastUpdatedAt: String(releaseState?.lastUpdatedAt || env.EVOLUTION_UPDATED_AT || generatedAt),
+      lastUpdateSource: String(releaseState?.lastUpdateSource || 'release'),
+      lastCheckError: official.error,
+      history: [],
+    },
+    protocol: {
+      version: readiness?.protocolVersion || readiness?.version || `v${installedVersion}`,
+      lastCheckedAt: generatedAt,
+      refreshPolicy: 'provider_managed',
+    },
+    checkedAt: generatedAt,
   };
 }
 
@@ -129,6 +182,41 @@ async function readLatestWahaVersion({ env, fetchImpl, now }) {
   return value;
 }
 
+async function readLatestEvolutionVersion({ env, fetchImpl, now }) {
+  const forced = String(env.EVOLUTION_LATEST_VERSION || '').trim().replace(/^v/, '');
+  if (forced) return { version: forced, checkedAt: now.toISOString(), error: null };
+  if (evolutionLatestCache && now.getTime() - evolutionLatestCache.timestamp < LATEST_CACHE_MS) {
+    return evolutionLatestCache.value;
+  }
+  const value = await readOfficialStableVersion({
+    url: env.EVOLUTION_RELEASES_URL || EVOLUTION_RELEASES_URL,
+    fetchImpl,
+    now,
+    versionPattern: /^\d+\.\d+\.\d+$/,
+  });
+  evolutionLatestCache = { timestamp: now.getTime(), value };
+  return value;
+}
+
+async function readOfficialStableVersion({ url, fetchImpl, now, versionPattern }) {
+  try {
+    const response = await fetchImpl(url, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Mentorian-WAHub' },
+      signal: AbortSignal.timeout(5000),
+    });
+    const body = await response.json().catch(() => null);
+    const candidate = response.ok && body && body.draft !== true && body.prerelease !== true && typeof body.tag_name === 'string'
+      ? body.tag_name.trim().replace(/^v/, '')
+      : '';
+    const version = versionPattern.test(candidate) ? candidate : '';
+    return version
+      ? { version, checkedAt: now.toISOString(), error: null }
+      : { version: null, checkedAt: now.toISOString(), error: 'official_registry_unavailable' };
+  } catch (_error) {
+    return { version: null, checkedAt: now.toISOString(), error: 'official_registry_unavailable' };
+  }
+}
+
 function persistObservedVersions(providers, configDir, observedAt) {
   const history = readVersionHistory(configDir);
   let changed = false;
@@ -180,6 +268,12 @@ function readProviderReleaseState(configDir) {
 
 function resetLatestCacheForTests() {
   wahaLatestCache = null;
+  evolutionLatestCache = null;
 }
 
-module.exports = { buildProviderInventory, readLatestWahaVersion, resetLatestCacheForTests };
+module.exports = {
+  buildProviderInventory,
+  readLatestWahaVersion,
+  readLatestEvolutionVersion,
+  resetLatestCacheForTests,
+};

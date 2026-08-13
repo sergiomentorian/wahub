@@ -33,26 +33,30 @@ sockets nao oficiais ativos para o mesmo numero.
 ## Atualização estável dos provedores
 
 Todo provedor homologado deve usar o canal estável com atualização protegida. Para
-o WAHA, o workflow `publish-waha-stable.yml` consulta somente a release oficial que
-não seja draft/prerelease, constrói a imagem NOWEB com o Baileys homologado e publica
-uma tag imutável no GHCR.
+WAHA e Evolution, os workflows `publish-waha-stable.yml` e
+`publish-evolution-stable.yml` consultam somente a release oficial que
+não seja draft/prerelease, constroem as imagens homologadas e publicam tags imutáveis
+no GHCR.
 
 Na VPS, instale uma vez o timer:
 
 ```bash
 sudo ops/install-waha-auto-update.sh
 sudo systemctl start mentorian-waha-auto-update.service
+sudo ops/install-evolution-auto-update.sh
+sudo systemctl start mentorian-evolution-auto-update.service
 ```
 
 O atualizador diário:
 
 1. bloqueia concorrência e valida a release estável e a imagem imutável;
 2. registra a quantidade de sessões operacionais;
-3. para somente o WAHA, cria backup cifrado do volume e promove a imagem;
+3. para somente o provedor alvo, cria backup cifrado do volume WAHA ou do banco
+   `evolution_db` e promove a imagem;
 4. só conclui quando as mesmas sessões voltam `WORKING`;
 5. restaura automaticamente a imagem anterior se o gate falhar;
 6. persiste versão, canal, data, origem e estado do auto-update para o MentorOps.
 
 Ele nunca chama `logout`, apaga credenciais nem gera QR Code. Backups cifrados são
-mantidos por 30 dias e a chave fica em `/etc/mentorian-waha-updater.env` com modo
-`0600`.
+mantidos por 30 dias e as chaves ficam em `/etc/mentorian-waha-updater.env` e
+`/etc/mentorian-evolution-updater.env`, ambas com modo `0600`.

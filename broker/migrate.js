@@ -298,7 +298,7 @@ async function run(registry, body) {
         if (from.api === 'mentorian') {
           throw new MigrateError(
             'SOURCE_RELEASE_FAILED',
-            `Baileys não confirmou a pausa; migração cancelada antes de importar no WAHA (${(e && e.message) || e})`
+            `Baileys não confirmou a pausa; migração cancelada antes de importar em ${to.api} (${(e && e.message) || e})`
           );
         }
         util.errlog('migrate: releaseForMigration falhou (segue)', e && e.message);
@@ -376,7 +376,7 @@ async function run(registry, body) {
     if (!connected) {
       throw new MigrateError(
         'DESTINATION_NOT_READY',
-        'WAHA não confirmou a sessão; a origem será restaurada automaticamente'
+        `${to.api} não confirmou a sessão; a origem será restaurada automaticamente`
       );
     }
 
@@ -385,7 +385,7 @@ async function run(registry, body) {
         api: to.api,
         id: toId,
       });
-      push('commit-origem', 'WAHA assumiu a sessão; restauração automática do Baileys bloqueada');
+      push('commit-origem', `${to.api} assumiu a sessão; restauração automática do Baileys bloqueada`);
     }
 
     return {

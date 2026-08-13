@@ -139,6 +139,19 @@ module.exports = {
     });
   },
 
+  async readiness(ctx) {
+    try {
+      const r = await util.httpJson('GET', `${ctx.apiUrl}/instance/fetchInstances`, {
+        apikey: ctx.apiKey,
+      });
+      if (!r.ok) return { ok: false, status: r.status };
+      const version = String(process.env.EVOLUTION_VERSION || process.env.EVO_VERSION || '2.3.7').replace(/^v/, '');
+      return { ok: true, version: `v${version}`, protocolVersion: `v${version}` };
+    } catch (_error) {
+      return { ok: false };
+    }
+  },
+
   // ── qr ────────────────────────────────────────────────────────────────────────
   // GET {apiUrl}/instance/connect/{name} → { base64, code, pairingCode }; estado via connectionState.
   async qr(ctx, id) {
@@ -178,6 +191,16 @@ module.exports = {
   async createSession(ctx, name) {
     const nm = String(name || '').trim();
     if (!nm) throw new passport.CredsError('NAME_REQUIRED', 'nome da instancia obrigatorio');
+    const existing = (await this.list(ctx)).find((item) => item.id === nm || item.name === nm);
+    if (existing) {
+      if (existing.connected) {
+        throw new passport.CredsError(
+          'DESTINATION_ACTIVE',
+          `Evolution "${nm}" já está conectada; migração recusada`,
+        );
+      }
+      return { id: nm, name: nm, reused: true };
+    }
     const r = await util.httpJson('POST', `${ctx.apiUrl}/instance/create`, {
       apikey: ctx.apiKey,
       body: { instanceName: nm, integration: 'WHATSAPP-BAILEYS' },
@@ -274,30 +297,36 @@ module.exports = {
 
   // ── setWebhook ────────────────────────────────────────────────────────────────
   // POST {apiUrl}/webhook/set/{name}. Best-effort — nunca lanca.
-  async setWebhook(ctx, id, url) {
+  async setWebhook(ctx, id, webhook) {
     const name = String(id);
+    const config = typeof webhook === 'string' ? { url: webhook } : (webhook || {});
+    const url = String(config.url || '').trim();
     if (!url) return;
-    try {
-      const r = await util.httpJson(
-        'POST',
-        `${ctx.apiUrl}/webhook/set/${encodeURIComponent(name)}`,
-        {
-          apikey: ctx.apiKey,
-          body: {
-            webhook: {
-              enabled: true,
-              url,
-              events: ['CONNECTION_UPDATE', 'MESSAGES_UPSERT'],
-            },
-          },
-        }
-      );
-      if (!r.ok) {
-        util.errlog(`[evolution] setWebhook name=${name} status=${r.status} detail=${JSON.stringify(r.data)}`);
-      }
-    } catch (e) {
-      util.errlog(`[evolution] setWebhook name=${name} falhou: ${(e && e.message) || e}`);
+    const headers = {};
+    if (typeof config.secret === 'string' && config.secret.length >= 32) {
+      headers['X-Mentorian-Evolution-Secret'] = config.secret;
     }
+    const r = await util.httpJson(
+      'POST',
+      `${ctx.apiUrl}/webhook/set/${encodeURIComponent(name)}`,
+      {
+        apikey: ctx.apiKey,
+        body: {
+          webhook: {
+            enabled: true,
+            url,
+            headers,
+            byEvents: false,
+            base64: false,
+            events: ['CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE'],
+          },
+        },
+      }
+    );
+    if (!r.ok) {
+      throw new Error(`Evolution setWebhook HTTP ${r.status}`);
+    }
+    return { ok: true };
   },
 
   // ── disconnect ────────────────────────────────────────────────────────────────
@@ -348,6 +377,53 @@ module.exports = {
     }
     const d = r.data || {};
     return { ok: true, messageId: (d.key && d.key.id) || d.id || undefined };
+  },
+
+  async sendMedia(ctx, id, input) {
+    const number = String(input && input.to || '').replace(/\D/g, '');
+    const mediaUrl = String(input && input.mediaUrl || '').trim();
+    const kind = String(input && input.kind || 'document');
+    if (!number || !mediaUrl.startsWith('https://')) {
+      throw new Error('evolution sendMedia: número ou URL inválida');
+    }
+    const mediatype = kind === 'audio' ? 'audio' : kind === 'video' ? 'video' : kind === 'image' ? 'image' : 'document';
+    const r = await util.httpJson(
+      'POST',
+      `${ctx.apiUrl}/message/sendMedia/${encodeURIComponent(id)}`,
+      {
+        apikey: ctx.apiKey,
+        body: {
+          number,
+          mediatype,
+          mimetype: String(input && input.mimeType || 'application/octet-stream'),
+          caption: String(input && input.caption || ''),
+          fileName: String(input && input.fileName || `arquivo-${Date.now()}`),
+          media: mediaUrl,
+        },
+      },
+    );
+    if (!r.ok) throw new Error(`evolution sendMedia: HTTP ${r.status}`);
+    const d = r.data || {};
+    return { ok: true, messageId: (d.key && d.key.id) || d.id || undefined };
+  },
+
+  async setPresence(ctx, id, to, state) {
+    const number = String(to || '').replace(/\D/g, '');
+    if (!number) throw new Error('evolution presence: número inválido');
+    const r = await util.httpJson(
+      'POST',
+      `${ctx.apiUrl}/chat/sendPresence/${encodeURIComponent(id)}`,
+      {
+        apikey: ctx.apiKey,
+        body: {
+          number,
+          presence: state === 'composing' ? 'composing' : 'paused',
+          delay: state === 'composing' ? 1200 : 0,
+        },
+      },
+    );
+    if (!r.ok) throw new Error(`evolution presence: HTTP ${r.status}`);
+    return { ok: true };
   },
 
   // ── releaseForMigration ─────────────────────────────────────────────────────

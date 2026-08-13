@@ -167,6 +167,10 @@ services:
       EVO_DATABASE_URI: "postgresql://postgres:${PG_PASSWORD}@postgres:5432/evolution_db?sslmode=disable"
       EVO_REDIS_URI: "redis://redis:6379/6"
       EVO_REDIS_PREFIX: "evolution"
+      EVOLUTION_VERSION: ${EVOLUTION_VERSION:-2.3.7}
+      EVOLUTION_UPDATED_AT: ${EVOLUTION_UPDATED_AT:-2026-08-13T00:00:00Z}
+      EVOLUTION_AUTOMATIC_UPDATES: ${EVOLUTION_AUTOMATIC_UPDATES:-true}
+      EVOLUTION_RELEASE_CHANNEL: ${EVOLUTION_RELEASE_CHANNEL:-stable}
       # Evolution Go
       EVOGO_API_URL: "http://evogo:8082"
       EVOGO_API_KEY: ${EVOGO_GLOBAL_KEY}

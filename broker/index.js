@@ -44,6 +44,11 @@ const secret = process.env.HUB_SECRET || '';
 const mutationsEnabled = process.env.HUB_MUTATIONS_ENABLED === 'true';
 const staticUiEnabled = process.env.HUB_STATIC_UI_ENABLED === 'true';
 const mentorianMigrationsEnabled = process.env.MENTORIAN_MIGRATIONS_ENABLED === 'true';
+const MENTORIAN_PROVIDER_MAP = Object.freeze({
+  baileys: 'mentorian',
+  waha: 'waha',
+  evolution: 'evolution',
+});
 
 // ── Config runtime por API (suporta instalações EXTERNAS à stack) ──────────────
 // Campos genéricos -> env vars que cada adapter lê no init(). O overlay parte de
@@ -304,7 +309,7 @@ app.post('/mentorian/migrate-to-waha', async (req, res) => {
   }
 });
 
-// Contrato privado do MentorOps: seleção bidirecional entre os dois motores
+// Contrato privado do MentorOps: seleção bidirecional entre os motores
 // homologados. Nunca aceita APIs arbitrárias enviadas pelo navegador.
 app.post('/mentorian/migrate-provider', async (req, res) => {
   if (!mentorianMigrationsEnabled) {
@@ -313,19 +318,17 @@ app.post('/mentorian/migrate-provider', async (req, res) => {
   const workspaceId = String((req.body && req.body.workspaceId) || '').trim();
   const from = String((req.body && req.body.from) || '');
   const to = String((req.body && req.body.to) || '');
-  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(workspaceId) || !['baileys', 'waha'].includes(from) || !['baileys', 'waha'].includes(to) || from === to) {
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(workspaceId) || !MENTORIAN_PROVIDER_MAP[from] || !MENTORIAN_PROVIDER_MAP[to] || from === to) {
     return res.status(400).json({ error: 'BAD_REQUEST', message: 'Seleção de provedor inválida' });
   }
   const migrate = require('./migrate');
   try {
     const result = await migrate.run(registry, {
-      from: from === 'baileys'
-        ? { api: 'mentorian', id: workspaceId }
-        : { api: 'waha', id: workspaceId },
+      from: { api: MENTORIAN_PROVIDER_MAP[from], id: workspaceId },
       to: to === 'baileys'
-        ? { api: 'mentorian', id: workspaceId }
-        : { api: 'waha', name: workspaceId },
-      webhook: to === 'waha' ? req.body.webhook : null,
+        ? { api: MENTORIAN_PROVIDER_MAP[to], id: workspaceId }
+        : { api: MENTORIAN_PROVIDER_MAP[to], name: workspaceId },
+      webhook: to === 'waha' || to === 'evolution' ? req.body.webhook : null,
       tier: 1,
     });
     res.json(result);
@@ -351,54 +354,88 @@ app.post('/mentorian/provider-inventory', async (_req, res) => {
 });
 
 app.post('/mentorian/configure-waha', async (req, res) => {
-  const workspaceId = mentorianWorkspaceId(req, res);
-  if (!workspaceId) return;
-  const entry = registry.waha;
+  req.body = { ...(req.body || {}), provider: 'waha' };
+  return configureMentorianProvider(req, res);
+});
+
+app.post('/mentorian/configure-provider', configureMentorianProvider);
+
+async function configureMentorianProvider(req, res) {
+  const resolved = mentorianProviderRequest(req, res);
+  if (!resolved) return;
+  const { workspaceId, provider, entry } = resolved;
+  if (provider === 'baileys') {
+    return res.status(400).json({ error: 'BAD_REQUEST', message: 'Baileys usa webhook fixo do gateway' });
+  }
   try {
     await entry.adapter.setWebhook(entry.ctx, workspaceId, req.body && req.body.webhook);
     const status = await entry.adapter.status(entry.ctx, workspaceId);
     res.json({ ok: status.connected === true, connected: status.connected === true, status: status.connected ? 'WORKING' : 'STOPPED' });
   } catch (e) {
-    util.errlog('Mentorian WAHA webhook configuration failed', e && e.name);
-    res.status(502).json({ error: 'WAHA_CONFIGURATION_FAILED' });
+    util.errlog('Mentorian provider webhook configuration failed', provider, e && e.name);
+    res.status(502).json({ error: 'PROVIDER_CONFIGURATION_FAILED' });
   }
-});
+}
 
 app.post('/mentorian/waha-status', async (req, res) => {
-  const workspaceId = mentorianWorkspaceId(req, res);
-  if (!workspaceId) return;
-  const status = await registry.waha.adapter.status(registry.waha.ctx, workspaceId);
+  req.body = { ...(req.body || {}), provider: 'waha' };
+  return mentorianProviderStatus(req, res);
+});
+app.post('/mentorian/provider-status', mentorianProviderStatus);
+
+async function mentorianProviderStatus(req, res) {
+  const resolved = mentorianProviderRequest(req, res);
+  if (!resolved) return;
+  const { workspaceId, entry } = resolved;
+  const status = await entry.adapter.status(entry.ctx, workspaceId);
   res.json({
     ok: true,
     connected: status.connected === true,
     status: status.connected ? 'WORKING' : 'STOPPED',
     phone: util.jidToNumber(status.jid),
   });
-});
+}
 
 app.post('/mentorian/waha-send', async (req, res) => {
-  const workspaceId = mentorianWorkspaceId(req, res);
-  if (!workspaceId) return;
+  req.body = { ...(req.body || {}), provider: 'waha' };
+  return mentorianProviderSend(req, res);
+});
+app.post('/mentorian/provider-send', mentorianProviderSend);
+
+async function mentorianProviderSend(req, res) {
+  const resolved = mentorianProviderRequest(req, res);
+  if (!resolved) return;
+  const { workspaceId, provider, entry } = resolved;
   try {
-    const result = await registry.waha.adapter.sendText(
-      registry.waha.ctx,
+    const result = await entry.adapter.sendText(
+      entry.ctx,
       workspaceId,
       req.body && req.body.phone,
       req.body && req.body.text,
     );
     res.json(result);
   } catch (e) {
-    util.errlog('Mentorian WAHA send failed', e && e.name);
-    res.status(502).json({ error: 'WAHA_SEND_FAILED' });
+    util.errlog('Mentorian provider send failed', provider, e && e.name);
+    res.status(502).json({ error: 'PROVIDER_SEND_FAILED' });
   }
-});
+}
 
 app.post('/mentorian/waha-send-media', async (req, res) => {
-  const workspaceId = mentorianWorkspaceId(req, res);
-  if (!workspaceId) return;
+  req.body = { ...(req.body || {}), provider: 'waha' };
+  return mentorianProviderSendMedia(req, res);
+});
+app.post('/mentorian/provider-send-media', mentorianProviderSendMedia);
+
+async function mentorianProviderSendMedia(req, res) {
+  const resolved = mentorianProviderRequest(req, res);
+  if (!resolved) return;
+  const { workspaceId, provider, entry } = resolved;
+  if (typeof entry.adapter.sendMedia !== 'function') {
+    return res.status(501).json({ error: 'NOT_SUPPORTED' });
+  }
   try {
-    const result = await registry.waha.adapter.sendMedia(
-      registry.waha.ctx,
+    const result = await entry.adapter.sendMedia(
+      entry.ctx,
       workspaceId,
       {
         to: req.body && req.body.phone,
@@ -412,31 +449,44 @@ app.post('/mentorian/waha-send-media', async (req, res) => {
     );
     res.json(result);
   } catch (e) {
-    util.errlog('Mentorian WAHA media send failed', e && e.name);
-    res.status(502).json({ error: 'WAHA_MEDIA_SEND_FAILED' });
+    util.errlog('Mentorian provider media send failed', provider, e && e.name);
+    res.status(502).json({ error: 'PROVIDER_MEDIA_SEND_FAILED' });
   }
-});
+}
 
 app.post('/mentorian/waha-presence', async (req, res) => {
-  const workspaceId = mentorianWorkspaceId(req, res);
-  if (!workspaceId) return;
+  req.body = { ...(req.body || {}), provider: 'waha' };
+  return mentorianProviderPresence(req, res);
+});
+app.post('/mentorian/provider-presence', mentorianProviderPresence);
+
+async function mentorianProviderPresence(req, res) {
+  const resolved = mentorianProviderRequest(req, res);
+  if (!resolved) return;
+  const { workspaceId, provider, entry } = resolved;
+  if (typeof entry.adapter.setPresence !== 'function') {
+    return res.status(501).json({ error: 'NOT_SUPPORTED' });
+  }
   try {
-    const result = await registry.waha.adapter.setPresence(
-      registry.waha.ctx,
+    const result = await entry.adapter.setPresence(
+      entry.ctx,
       workspaceId,
       req.body && req.body.phone,
       req.body && req.body.state,
     );
     res.json(result);
   } catch (e) {
-    util.errlog('Mentorian WAHA presence failed', e && e.name);
-    res.status(502).json({ error: 'WAHA_PRESENCE_FAILED' });
+    util.errlog('Mentorian provider presence failed', provider, e && e.name);
+    res.status(502).json({ error: 'PROVIDER_PRESENCE_FAILED' });
   }
-});
+}
 
-function mentorianWorkspaceId(req, res) {
-  if (!mentorianMigrationsEnabled || !registry.waha) {
-    res.status(503).json({ error: 'MENTORIAN_WAHA_DISABLED' });
+function mentorianProviderRequest(req, res) {
+  const provider = String((req.body && req.body.provider) || '').trim();
+  const adapterId = MENTORIAN_PROVIDER_MAP[provider];
+  const entry = adapterId && registry[adapterId];
+  if (!mentorianMigrationsEnabled || !entry) {
+    res.status(503).json({ error: 'MENTORIAN_PROVIDER_DISABLED' });
     return null;
   }
   const workspaceId = String((req.body && req.body.workspaceId) || '').trim();
@@ -444,7 +494,7 @@ function mentorianWorkspaceId(req, res) {
     res.status(400).json({ error: 'BAD_REQUEST', message: 'workspaceId invalido' });
     return null;
   }
-  return workspaceId;
+  return { workspaceId, provider, entry };
 }
 
 // ── POST /:api/restart?id=<s> — regenera o QR (reinicia a sessão) ──────────────

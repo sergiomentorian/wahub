@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Mentorian Evolution API stable update check
+
+[Timer]
+OnCalendar=*-*-* 05:10:00 America/Sao_Paulo
+RandomizedDelaySec=20m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
