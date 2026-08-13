@@ -181,6 +181,9 @@ services:
       WAHA_API_URL: "http://waha:3000"
       WAHA_API_KEY: ${WAHA_API_KEY}
       WAHA_SESSIONS_DIR: "/waha-sessions"
+      WAHA_VERSION: ${WAHA_VERSION:-2026.7.1}
+      WAHA_UPDATED_AT: ${WAHA_UPDATED_AT:-2026-08-13T00:00:00Z}
+      WAHA_AUTOMATIC_UPDATES: ${WAHA_AUTOMATIC_UPDATES:-false}
       # UAZAPI (hospedado externo)
       UAZAPI_API_URL: ${UAZAPI_API_URL:-https://api.uazapi.com}
       UAZAPI_ADMIN_TOKEN: ${UAZAPI_ADMIN_TOKEN}

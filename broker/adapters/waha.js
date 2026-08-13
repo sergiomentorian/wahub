@@ -131,6 +131,13 @@ module.exports = {
     return { apiUrl, apiKey, sessionsDir, engine };
   },
 
+  async readiness(ctx) {
+    const r = await util.httpJson('GET', `${ctx.apiUrl}/api/sessions?all=true`, {
+      headers: authHeaders(ctx),
+    });
+    return { ok: r.ok === true, engine: ctx.engine };
+  },
+
   // ── list ──────────────────────────────────────────────────────────────────────
   // GET {apiUrl}/api/sessions → [{ name, status, me:{ id } }].
   async list(ctx) {
