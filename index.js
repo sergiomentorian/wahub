@@ -9,9 +9,9 @@
  *
  * ── Segurança ─────────────────────────────────────────────────────────────────
  *  - Todas as rotas de DADOS exigem `x-hub-secret` (HUB_SECRET, comparação em tempo
- *    constante via util.requireSecret). `GET /health` e a UI estática (`GET /`) são
- *    públicas (mesma origem). O middleware de secret é montado DEPOIS do static e do
- *    /health, ANTES das rotas de dados.
+ *    constante via util.requireSecret). `GET /health` e, quando explicitamente
+ *    habilitada, a UI estática (`GET /`) são públicas (mesma origem). Na instalação
+ *    Mentorian a UI fica desligada e o middleware de secret protege as rotas de dados.
  *
  * ── Anti-colisão ───────────────────────────────────────────────────────────────
  *  - O registry é keyed por id EXATO do adapter (evogo != evo). Nunca String.includes.
@@ -40,6 +40,8 @@ const registry = {};
 const modules = {};
 
 const secret = process.env.HUB_SECRET || '';
+const mutationsEnabled = process.env.HUB_MUTATIONS_ENABLED === 'true';
+const staticUiEnabled = process.env.HUB_STATIC_UI_ENABLED === 'true';
 
 // ── Config runtime por API (suporta instalações EXTERNAS à stack) ──────────────
 // Campos genéricos -> env vars que cada adapter lê no init(). O overlay parte de
@@ -105,13 +107,21 @@ async function applyApiConfig(name, fields) {
 const app = express();
 app.use(express.json({ limit: '15mb' }));
 
-// UI estática (pública, mesma origem) — servida ANTES do gate de secret.
-app.use(express.static(path.join(__dirname, 'public')));
+// Na instalacao Mentorian a UI upstream fica desligada: ela persiste HUB_SECRET
+// no localStorage. O painel privado do MentorOps usa o broker server-to-server.
+if (staticUiEnabled) {
+  app.use(express.static(path.join(__dirname, 'public')));
+}
 
 // ── /health (SEM secret) ───────────────────────────────────────────────────────
 // Público: liveness + quais APIs subiram no registry.
 app.get('/health', (req, res) => {
-  res.json({ ok: true, apis: Object.keys(registry) });
+  res.json({
+    ok: true,
+    apis: Object.keys(registry),
+    mode: mutationsEnabled ? 'mutations-enabled' : 'read-only',
+    staticUi: staticUiEnabled,
+  });
 });
 
 // ── Gate de secret: tudo abaixo exige x-hub-secret ──────────────────────────────
@@ -157,7 +167,7 @@ app.get('/sessions', async (req, res) => {
 });
 
 // ── GET /:api/qr?id=<s> — proxy do QR ──────────────────────────────────────────
-app.get('/:api/qr', async (req, res) => {
+app.get('/:api/qr', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const entry = requireApi(req, res);
   if (!entry) return;
   try {
@@ -170,7 +180,7 @@ app.get('/:api/qr', async (req, res) => {
 });
 
 // ── POST /:api/create { name } — cria sessão ───────────────────────────────────
-app.post('/:api/create', async (req, res) => {
+app.post('/:api/create', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const entry = requireApi(req, res);
   if (!entry) return;
   const name = req.body && req.body.name;
@@ -188,7 +198,7 @@ app.post('/:api/create', async (req, res) => {
 
 // ── POST /:api/send { id, to, text } — envio de TEXTO de teste ─────────────────
 // Confirma que a sessão realmente envia (útil p/ validar logo após migrar de API).
-app.post('/:api/send', async (req, res) => {
+app.post('/:api/send', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const entry = requireApi(req, res);
   if (!entry) return;
   const { id, to, text } = req.body || {};
@@ -208,7 +218,7 @@ app.post('/:api/send', async (req, res) => {
 });
 
 // ── POST /:api/import { id, passport|creds } — grava passaporte + connect ───────
-app.post('/:api/import', async (req, res) => {
+app.post('/:api/import', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const entry = requireApi(req, res);
   if (!entry) return;
   const id = req.body && req.body.id;
@@ -249,7 +259,7 @@ app.get('/:api/export', async (req, res) => {
 
 // ── POST /migrate — orquestra a migração 1-clique ─────────────────────────
 // require em runtime (migrate.js pode evoluir independente; mantém o boot leve).
-app.post('/migrate', async (req, res) => {
+app.post('/migrate', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const migrate = require('./migrate');
   try {
     const r = await migrate.run(registry, req.body);
@@ -265,7 +275,7 @@ app.post('/migrate', async (req, res) => {
 });
 
 // ── POST /:api/restart?id=<s> — regenera o QR (reinicia a sessão) ──────────────
-app.post('/:api/restart', async (req, res) => {
+app.post('/:api/restart', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const entry = requireApi(req, res);
   if (!entry) return;
   const id = req.query.id || (req.body && req.body.id);
@@ -284,7 +294,7 @@ app.post('/:api/restart', async (req, res) => {
 
 // ── POST /:api/disconnect?id=<s> — desconecta a sessão (mantém as creds) ────────
 // Para o socket sem deslogar/desregistrar. (Evolution não expõe isso via HTTP → no-op.)
-app.post('/:api/disconnect', async (req, res) => {
+app.post('/:api/disconnect', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const entry = requireApi(req, res);
   if (!entry) return;
   const id = req.query.id || (req.body && req.body.id);
@@ -302,7 +312,7 @@ app.post('/:api/disconnect', async (req, res) => {
 });
 
 // ── DELETE /:api/session?id=<s> — remove a sessão da API ───────────────────────
-app.delete('/:api/session', async (req, res) => {
+app.delete('/:api/session', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const entry = requireApi(req, res);
   if (!entry) return;
   const id = req.query.id || (req.body && req.body.id);
@@ -357,7 +367,7 @@ app.get('/config', (req, res) => {
 // Campo vazio/omitido MANTÉM o valor anterior (tokens/DSNs não precisam ser
 // redigitados). `reset:true` descarta o overlay e volta ao padrão da stack (.env).
 // Overlays são PERSISTIDOS em CONFIG_FILE (volume) — sobrevivem a restart/rebuild.
-app.post('/config/:api', async (req, res) => {
+app.post('/config/:api', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const name = req.params.api;
   const mod = modules[name];
   if (!mod) return res.status(404).json({ error: 'UNKNOWN_API', api: name });
