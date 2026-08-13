@@ -344,28 +344,36 @@ module.exports = {
 
   // ── setWebhook ────────────────────────────────────────────────────────────────
   // PUT {apiUrl}/api/sessions/{s} { config:{ webhooks:[{ url, events }] } }. Best-effort.
-  async setWebhook(ctx, id, url) {
+  async setWebhook(ctx, id, webhook) {
     const s = String(id);
+    const config = typeof webhook === 'string' ? { url: webhook } : (webhook || {});
+    const url = String(config.url || '').trim();
     if (!url) return;
-    try {
-      const r = await util.httpJson(
-        'PUT',
-        `${ctx.apiUrl}/api/sessions/${encodeURIComponent(s)}`,
-        {
-          headers: authHeaders(ctx),
-          body: {
-            config: {
-              webhooks: [{ url, events: ['message', 'session.status'] }],
-            },
-          },
-        }
-      );
-      if (!r.ok) {
-        util.errlog(`[waha] setWebhook session=${s} status=${r.status} detail=${JSON.stringify(r.data)}`);
-      }
-    } catch (e) {
-      util.errlog(`[waha] setWebhook session=${s} falhou: ${(e && e.message) || e}`);
+    const hook = {
+      url,
+      events: ['message', 'message.ack', 'session.status'],
+      retries: { policy: 'exponential', delaySeconds: 2, attempts: 8 },
+    };
+    if (typeof config.hmacKey === 'string' && config.hmacKey.length >= 32) {
+      hook.hmac = { key: config.hmacKey };
     }
+    const r = await util.httpJson(
+      'PUT',
+      `${ctx.apiUrl}/api/sessions/${encodeURIComponent(s)}`,
+      {
+        headers: authHeaders(ctx),
+        body: {
+          config: {
+            webhooks: [hook],
+            noweb: { markOnline: false },
+          },
+        },
+      }
+    );
+    if (!r.ok) {
+      throw new Error(`WAHA setWebhook HTTP ${r.status}`);
+    }
+    return { ok: true };
   },
 
   // ── disconnect ────────────────────────────────────────────────────────────────
@@ -418,6 +426,58 @@ module.exports = {
     const d = r.data || {};
     const mid = (d.id && (d.id._serialized || d.id.id || d.id)) || d.messageId;
     return { ok: true, messageId: typeof mid === 'string' ? mid : undefined };
+  },
+
+  async sendMedia(ctx, id, input) {
+    const num = String(input && input.to || '').replace(/\D/g, '');
+    const mediaUrl = String(input && input.mediaUrl || '').trim();
+    const kind = String(input && input.kind || 'document');
+    if (!num || !mediaUrl.startsWith('https://')) {
+      throw new Error('waha sendMedia: número ou URL inválida');
+    }
+    const endpoint = {
+      image: 'sendImage',
+      audio: input && input.ptt === true ? 'sendVoice' : 'sendFile',
+      video: 'sendVideo',
+      document: 'sendFile',
+    }[kind] || 'sendFile';
+    const body = {
+      session: String(id),
+      chatId: `${num}@c.us`,
+      file: {
+        url: mediaUrl,
+        mimetype: String(input && input.mimeType || 'application/octet-stream'),
+        filename: String(input && input.fileName || `arquivo-${Date.now()}`),
+      },
+      caption: String(input && input.caption || ''),
+      ...(endpoint === 'sendVoice' || endpoint === 'sendVideo' ? { convert: true } : {}),
+    };
+    const r = await util.httpJson('POST', `${ctx.apiUrl}/api/${endpoint}`, {
+      headers: authHeaders(ctx),
+      body,
+    });
+    if (!r.ok) throw new Error(`waha sendMedia: HTTP ${r.status}`);
+    const d = r.data || {};
+    const mid = (d.id && (d.id._serialized || d.id.id || d.id)) || d.messageId;
+    return { ok: true, messageId: typeof mid === 'string' ? mid : undefined };
+  },
+
+  async setPresence(ctx, id, to, state) {
+    const num = String(to || '').replace(/\D/g, '');
+    if (!num) throw new Error('waha presence: número inválido');
+    const r = await util.httpJson(
+      'POST',
+      `${ctx.apiUrl}/api/${encodeURIComponent(String(id))}/presence`,
+      {
+        headers: authHeaders(ctx),
+        body: {
+          chatId: `${num}@c.us`,
+          presence: state === 'composing' ? 'typing' : 'paused',
+        },
+      }
+    );
+    if (!r.ok) throw new Error(`waha presence: HTTP ${r.status}`);
+    return { ok: true };
   },
 
   // ── releaseForMigration ─────────────────────────────────────────────────────

@@ -52,6 +52,7 @@ const STATUS_BY_CODE = {
   SOURCE_EXPORT_UNSUPPORTED: 400,
   SOURCE_NOT_READY: 400,
   SOURCE_RELEASE_FAILED: 502,
+  WEBHOOK_FAILED: 502,
   LOCKED: 409,
   NUMBER_ALREADY_CONNECTED: 409,
   DESTINATION_NOT_READY: 502,
@@ -112,7 +113,7 @@ async function run(registry, body) {
   const to = b.to || {};
   const tier = b.tier != null ? Number(b.tier) : 1;
   const cleanup = b.cleanup === true;
-  const webhookUrl = b.webhookUrl;
+  const webhook = b.webhook || (b.webhookUrl ? { url: b.webhookUrl } : null);
 
   // ── Validação de forma ───────────────────────────────────────────────────────
   if (!from.api || !from.id) {
@@ -186,6 +187,7 @@ async function run(registry, body) {
   let sourceReleased = false;
   let toId = to.id || null;
   let destinationCreated = false;
+  let sourcePassport = null;
   if (number) {
     if (locks.has(number)) {
       throw new MigrateError('LOCKED', `migração já em andamento para o número ${number}`);
@@ -253,6 +255,7 @@ async function run(registry, body) {
       throw new MigrateError('SOURCE_EXPORT_UNSUPPORTED', `${from.api} não retornou passaporte`);
     }
     const passReady = passport.ensurePublics(pass);
+    sourcePassport = passReady;
 
     // Tier 2 (SÓ mesma-família): lê o store completo da origem AGORA (antes do wipe).
     const sameFamily = fromAdapter.family === toAdapter.family;
@@ -346,11 +349,17 @@ async function run(registry, body) {
     // estabilizava). DEPOIS do import, o connect do webhook sobe o device recém-injetado
     // (correto) com subscribe ALL. Os outros 4 adapters têm setWebhook = escrita de config
     // pura (não conecta), então a ordem lhes é indiferente.
-    if (webhookUrl) {
+    if (webhook) {
       try {
-        await toAdapter.setWebhook(toCtx, toId, webhookUrl);
+        await toAdapter.setWebhook(toCtx, toId, webhook);
         push('webhook', 'webhook registrado no destino');
       } catch (e) {
+        if (from.api === 'mentorian' || to.api === 'mentorian') {
+          throw new MigrateError(
+            'WEBHOOK_FAILED',
+            `Webhook do destino não foi confirmado; a origem será restaurada (${(e && e.message) || e})`
+          );
+        }
         util.errlog('migrate: setWebhook falhou (best-effort)', e && e.message);
         push('webhook', 'webhook falhou (best-effort): ' + (e && e.message));
       }
@@ -410,6 +419,17 @@ async function run(registry, body) {
         if (typeof fromAdapter.rollbackMigration === 'function') {
           await fromAdapter.rollbackMigration(fromCtx, from.id);
           push('rollback-origem', 'Baileys restaurado automaticamente');
+        } else if (sourcePassport && typeof fromAdapter.importPassport === 'function') {
+          await fromAdapter.importPassport(fromCtx, from.id, sourcePassport);
+          const restored = await util.pollUntil(
+            () => fromAdapter.status(fromCtx, from.id),
+            (status) => status && status.connected,
+            { timeoutMs: 90000, intervalMs: 3000 }
+          );
+          if (!restored || !restored.connected) {
+            throw new Error('origem não confirmou conexão após rollback');
+          }
+          push('rollback-origem', `${from.api} restaurado automaticamente`);
         }
       } catch (rollbackError) {
         util.errlog('migrate: rollback da origem falhou', rollbackError && rollbackError.message);

@@ -25,7 +25,7 @@ function passportFixture() {
   };
 }
 
-function registryFor({ importFailure = false, releaseFailure = false } = {}) {
+function registryFor({ importFailure = false, releaseFailure = false, webhookFailure = false } = {}) {
   const calls = [];
   let released = false;
   const source = {
@@ -65,6 +65,10 @@ function registryFor({ importFailure = false, releaseFailure = false } = {}) {
       calls.push('import-destination');
       if (importFailure) throw new Error('destination import failed');
       return { ok: true, jid: '5511999999999:1@s.whatsapp.net' };
+    },
+    async setWebhook() {
+      calls.push('webhook-destination');
+      if (webhookFailure) throw new Error('webhook failed');
     },
     async status() {
       return { connected: true };
@@ -118,6 +122,76 @@ test('Mentorian source is restored when WAHA import fails', async () => {
     'release-destination',
     'rollback-source',
   ]);
+});
+
+test('Mentorian source is restored when WAHA webhook is not confirmed', async () => {
+  const fixture = registryFor({ webhookFailure: true });
+
+  await assert.rejects(
+    migrate.run(fixture.registry, {
+      from: { api: 'mentorian', id: 'workspace-123' },
+      to: { api: 'waha', name: 'workspace-123' },
+      webhook: { url: 'https://app.example.test/webhook', hmacKey: 'x'.repeat(64) },
+    }),
+    (error) => error && error.code === 'WEBHOOK_FAILED',
+  );
+  assert.deepEqual(fixture.calls, [
+    'export',
+    'create-destination',
+    'release-source',
+    'import-destination',
+    'webhook-destination',
+    'release-destination',
+    'rollback-source',
+  ]);
+});
+
+test('WAHA migrates back to Mentorian Baileys and confirms destination', async () => {
+  const calls = [];
+  let wahaReleased = false;
+  const registry = {
+    waha: {
+      ctx: {},
+      adapter: {
+        family: 'baileys',
+        async status() {
+          return wahaReleased
+            ? { connected: false, jid: null }
+            : { connected: true, jid: '5511999999999:1@s.whatsapp.net' };
+        },
+        async exportPassport() {
+          calls.push('export-waha');
+          return { passport: passportFixture() };
+        },
+        async releaseForMigration() {
+          wahaReleased = true;
+          calls.push('release-waha');
+        },
+      },
+    },
+    mentorian: {
+      ctx: {},
+      adapter: {
+        family: 'baileys',
+        async importPassport() {
+          calls.push('import-mentorian');
+          return { jid: '5511999999999:1@s.whatsapp.net' };
+        },
+        async status() {
+          return { connected: true, jid: '5511999999999:1@s.whatsapp.net' };
+        },
+      },
+    },
+  };
+
+  const result = await migrate.run(registry, {
+    from: { api: 'waha', id: 'workspace-123' },
+    to: { api: 'mentorian', id: 'workspace-123' },
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.to.api, 'mentorian');
+  assert.deepEqual(calls, ['export-waha', 'release-waha', 'import-mentorian']);
 });
 
 test('WAHA import never starts when Mentorian source cannot be paused', async () => {
