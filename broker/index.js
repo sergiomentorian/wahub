@@ -23,6 +23,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const brokerPackage = require('./package.json');
 const express = require('express');
 
 const util = require('./lib/util');
@@ -126,6 +127,7 @@ if (staticUiEnabled) {
 app.get('/health', (req, res) => {
   res.json({
     ok: true,
+    version: brokerPackage.version,
     apis: Object.keys(registry),
     mode: mutationsEnabled ? 'mutations-enabled' : 'read-only',
     staticUi: staticUiEnabled,
