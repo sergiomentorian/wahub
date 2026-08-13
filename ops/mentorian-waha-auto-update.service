@@ -1,0 +1,15 @@
+[Unit]
+Description=Mentorian WAHA stable auto-update
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/mentorian-waha-updater.env
+ExecStart=/usr/local/sbin/mentorian-waha-auto-update
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+NoNewPrivileges=true

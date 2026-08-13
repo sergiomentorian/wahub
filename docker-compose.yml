@@ -124,8 +124,8 @@ services:
       context: .
       dockerfile: waha-noweb/Dockerfile
       args:
-        WAHA_BASE_IMAGE: ${WAHA_IMAGE:-devlikeapro/waha:noweb-2026.7.1}
-    image: ${WAHA_RUNTIME_IMAGE:-mentorian/waha-noweb:2026.7.1-baileys-rc14}
+        WAHA_BASE_IMAGE: ${WAHA_IMAGE:-devlikeapro/waha:noweb-2026.7.2}
+    image: ${WAHA_RUNTIME_IMAGE:-ghcr.io/sergiomentorian/waha-noweb:2026.7.2-baileys-rc14}
     # WAHA roda como root, enquanto o broker endurecido roda como uid/gid 1000.
     # Mantemos o volume privado, mas compartilhamos a escrita pelo grupo 1000:
     # sem isso, uma sessao criada pelo WAHA nasce root:root/0755 e o broker nao
@@ -181,9 +181,10 @@ services:
       WAHA_API_URL: "http://waha:3000"
       WAHA_API_KEY: ${WAHA_API_KEY}
       WAHA_SESSIONS_DIR: "/waha-sessions"
-      WAHA_VERSION: ${WAHA_VERSION:-2026.7.1}
+      WAHA_VERSION: ${WAHA_VERSION:-2026.7.2}
       WAHA_UPDATED_AT: ${WAHA_UPDATED_AT:-2026-08-13T00:00:00Z}
-      WAHA_AUTOMATIC_UPDATES: ${WAHA_AUTOMATIC_UPDATES:-false}
+      WAHA_AUTOMATIC_UPDATES: ${WAHA_AUTOMATIC_UPDATES:-true}
+      WAHA_RELEASE_CHANNEL: ${WAHA_RELEASE_CHANNEL:-stable}
       # UAZAPI (hospedado externo)
       UAZAPI_API_URL: ${UAZAPI_API_URL:-https://api.uazapi.com}
       UAZAPI_ADMIN_TOKEN: ${UAZAPI_ADMIN_TOKEN}

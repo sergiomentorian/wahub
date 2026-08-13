@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Mentorian WAHA stable update check
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 America/Sao_Paulo
+RandomizedDelaySec=20m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

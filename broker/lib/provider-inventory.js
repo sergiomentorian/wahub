@@ -9,13 +9,15 @@ let wahaLatestCache = null;
 
 async function buildProviderInventory({ registry, env = process.env, fetchImpl = fetch, now = new Date() }) {
   const generatedAt = now.toISOString();
+  const configDir = env.BROKER_CONFIG_DIR || path.join(__dirname, '..');
+  const releaseState = readProviderReleaseState(configDir);
   const [baileys, waha] = await Promise.all([
     buildBaileysProvider(registry.mentorian, generatedAt),
-    buildWahaProvider(registry.waha, env, fetchImpl, generatedAt),
+    buildWahaProvider(registry.waha, env, fetchImpl, generatedAt, releaseState.waha),
   ]);
   const providers = [baileys, waha];
-  persistObservedVersions(providers, env.BROKER_CONFIG_DIR || path.join(__dirname, '..'), generatedAt);
-  const history = readVersionHistory(env.BROKER_CONFIG_DIR || path.join(__dirname, '..'));
+  persistObservedVersions(providers, configDir, generatedAt);
+  const history = readVersionHistory(configDir);
 
   return {
     ok: providers.every((provider) => provider.online),
@@ -54,7 +56,7 @@ async function buildBaileysProvider(entry, generatedAt) {
   };
 }
 
-async function buildWahaProvider(entry, env, fetchImpl, generatedAt) {
+async function buildWahaProvider(entry, env, fetchImpl, generatedAt, releaseState = null) {
   let readiness = null;
   try {
     readiness = entry && typeof entry.adapter.readiness === 'function'
@@ -63,7 +65,7 @@ async function buildWahaProvider(entry, env, fetchImpl, generatedAt) {
   } catch (_error) {
     readiness = null;
   }
-  const installedVersion = String(env.WAHA_VERSION || '2026.7.1').replace(/^v/, '');
+  const installedVersion = String(releaseState?.installedVersion || env.WAHA_VERSION || '2026.7.2').replace(/^v/, '');
   const official = await readLatestWahaVersion({ env, fetchImpl, now: new Date(generatedAt) });
   const latestVersion = official.version;
   const status = !latestVersion
@@ -83,12 +85,12 @@ async function buildWahaProvider(entry, env, fetchImpl, generatedAt) {
       installedVersion,
       latestVersion,
       status,
-      releaseChannel: 'pinned',
+      releaseChannel: String(releaseState?.releaseChannel || env.WAHA_RELEASE_CHANNEL || 'stable'),
       prerelease: false,
-      automaticUpdates: env.WAHA_AUTOMATIC_UPDATES === 'true',
+      automaticUpdates: releaseState?.automaticUpdates === true || env.WAHA_AUTOMATIC_UPDATES === 'true',
       lastCheckedAt: official.checkedAt,
-      lastUpdatedAt: String(env.WAHA_UPDATED_AT || generatedAt),
-      lastUpdateSource: 'release',
+      lastUpdatedAt: String(releaseState?.lastUpdatedAt || env.WAHA_UPDATED_AT || generatedAt),
+      lastUpdateSource: String(releaseState?.lastUpdateSource || 'release'),
       lastCheckError: official.error,
       history: [],
     },
@@ -114,7 +116,7 @@ async function readLatestWahaVersion({ env, fetchImpl, now }) {
       signal: AbortSignal.timeout(5000),
     });
     const body = await response.json().catch(() => null);
-    const version = response.ok && body && typeof body.tag_name === 'string'
+    const version = response.ok && body && body.draft !== true && body.prerelease !== true && typeof body.tag_name === 'string'
       ? body.tag_name.trim().replace(/^v/, '')
       : '';
     value = version
@@ -163,6 +165,17 @@ function readVersionHistory(configDir) {
 
 function historyFile(configDir) {
   return path.join(configDir, 'provider-version-history.json');
+}
+
+function readProviderReleaseState(configDir) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.join(configDir, 'provider-release-state.json'), 'utf8'));
+    return parsed && parsed.version === 1 && parsed.providers && typeof parsed.providers === 'object'
+      ? parsed.providers
+      : {};
+  } catch (_error) {
+    return {};
+  }
 }
 
 function resetLatestCacheForTests() {

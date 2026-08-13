@@ -1,4 +1,4 @@
-ARG WAHA_BASE_IMAGE=devlikeapro/waha:noweb-2026.7.1
+ARG WAHA_BASE_IMAGE=devlikeapro/waha:noweb-2026.7.2
 
 FROM node:20-alpine AS baileys-builder
 
@@ -19,9 +19,8 @@ FROM ${WAHA_BASE_IMAGE}
 
 USER root
 
-# A imagem WAHA 2026.7.1 foi publicada com o fork Baileys rc13. Mantemos toda
-# a release estavel do WAHA e substituimos somente o pacote NOWEB pelo commit
-# rc14 fixado do proprio fork devlikeapro, compativel com o gateway Mentorian.
+# Mantemos a release estavel do WAHA e fixamos o pacote NOWEB no commit Baileys
+# homologado pela Mentorian. O build falha se a versao ou o protocolo divergirem.
 RUN rm -rf \
   /app/node_modules/@adiwajshing/baileys/lib \
   /app/node_modules/@adiwajshing/baileys/WAProto

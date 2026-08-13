@@ -56,6 +56,55 @@ test('returns only the two Mentorian-approved providers with isolated health', a
   assert.equal(inventory.providers[1].package.history[0].version, '2026.7.1');
 });
 
+test('uses the protected stable auto-update state persisted by the VPS updater', async () => {
+  resetLatestCacheForTests();
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-provider-release-state-'));
+  fs.writeFileSync(path.join(configDir, 'provider-release-state.json'), JSON.stringify({
+    version: 1,
+    providers: {
+      waha: {
+        installedVersion: '2026.7.2',
+        releaseChannel: 'stable',
+        automaticUpdates: true,
+        lastUpdatedAt: '2026-08-13T18:00:00.000Z',
+        lastUpdateSource: 'automatic',
+      },
+    },
+  }));
+  const inventory = await buildProviderInventory({
+    registry: {
+      mentorian: { ctx: {}, adapter: { readiness: async () => ({ ok: true }) } },
+      waha: { ctx: {}, adapter: { readiness: async () => ({ ok: true, engine: 'NOWEB' }) } },
+    },
+    env: { BROKER_CONFIG_DIR: configDir, WAHA_VERSION: '2026.7.1' },
+    fetchImpl: async () => ({ ok: true, json: async () => ({ tag_name: '2026.7.2', draft: false, prerelease: false }) }),
+    now: new Date('2026-08-13T19:00:00.000Z'),
+  });
+  const waha = inventory.providers.find((provider) => provider.id === 'waha');
+  assert.equal(waha.package.installedVersion, '2026.7.2');
+  assert.equal(waha.package.releaseChannel, 'stable');
+  assert.equal(waha.package.automaticUpdates, true);
+  assert.equal(waha.package.status, 'up_to_date');
+  assert.equal(waha.package.lastUpdateSource, 'automatic');
+});
+
+test('rejects a prerelease from the official release feed', async () => {
+  resetLatestCacheForTests();
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-provider-prerelease-'));
+  const inventory = await buildProviderInventory({
+    registry: {
+      mentorian: { ctx: {}, adapter: { readiness: async () => ({ ok: true }) } },
+      waha: { ctx: {}, adapter: { readiness: async () => ({ ok: true, engine: 'NOWEB' }) } },
+    },
+    env: { BROKER_CONFIG_DIR: configDir, WAHA_VERSION: '2026.7.1' },
+    fetchImpl: async () => ({ ok: true, json: async () => ({ tag_name: '2026.8.0-beta.1', draft: false, prerelease: true }) }),
+    now: new Date('2026-08-13T19:00:00.000Z'),
+  });
+  const waha = inventory.providers.find((provider) => provider.id === 'waha');
+  assert.equal(waha.package.latestVersion, null);
+  assert.equal(waha.package.status, 'check_failed');
+});
+
 test('keeps one provider failure from hiding the healthy provider', async () => {
   resetLatestCacheForTests();
   const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-provider-isolation-'));
