@@ -51,8 +51,10 @@ const STATUS_BY_CODE = {
   BAD_REQUEST: 400,
   SOURCE_EXPORT_UNSUPPORTED: 400,
   SOURCE_NOT_READY: 400,
+  SOURCE_RELEASE_FAILED: 502,
   LOCKED: 409,
   NUMBER_ALREADY_CONNECTED: 409,
+  DESTINATION_NOT_READY: 502,
 };
 
 // [AUDIT] LOCK por-número em memória do módulo (mutex de processo). Chave = número
@@ -114,6 +116,9 @@ async function run(registry, body) {
   // Só travamos quando conseguimos derivar um número — sem jid não há chave de lock
   // confiável (nem de dedup); seguimos sem trava nesse caso de borda.
   let lockKey = null;
+  let sourceReleased = false;
+  let toId = to.id || null;
+  let destinationCreated = false;
   if (number) {
     if (locks.has(number)) {
       throw new MigrateError('LOCKED', `migração já em andamento para o número ${number}`);
@@ -196,13 +201,13 @@ async function run(registry, body) {
     push('export');
 
     // ── PASSO 3: criar destino se preciso ───────────────────────────────────────
-    let toId = to.id;
     if (!toId) {
       const c = await toAdapter.createSession(toCtx, to.name);
       toId = c && c.id;
       if (!toId) {
         throw new MigrateError('BAD_REQUEST', `createSession em ${to.api} não retornou id`);
       }
+      destinationCreated = true;
       push('create', 'destino criado: ' + toId);
     }
 
@@ -215,14 +220,22 @@ async function run(registry, body) {
     if (typeof fromAdapter.releaseForMigration === 'function') {
       try {
         await fromAdapter.releaseForMigration(fromCtx, from.id);
+        sourceReleased = true;
         push('release-origem', 'origem parada e sessão local limpa (sem deslogar)');
       } catch (e) {
+        if (from.api === 'mentorian') {
+          throw new MigrateError(
+            'SOURCE_RELEASE_FAILED',
+            `Baileys não confirmou a pausa; migração cancelada antes de importar no WAHA (${(e && e.message) || e})`
+          );
+        }
         util.errlog('migrate: releaseForMigration falhou (segue)', e && e.message);
         push('release-origem', 'falha ao liberar origem (segue): ' + (e && e.message));
       }
     } else {
       try {
         await fromAdapter.disconnect(fromCtx, from.id);
+        sourceReleased = true;
       } catch (_e) {
         /* best-effort */
       }
@@ -278,13 +291,24 @@ async function run(registry, body) {
     const ok = await util.pollUntil(
       () => toAdapter.status(toCtx, toId),
       (s) => s && s.connected,
-      { timeoutMs: 25000, intervalMs: 3000 }
+      { timeoutMs: from.api === 'mentorian' ? 90000 : 25000, intervalMs: 3000 }
     );
     const connected = !!(ok && ok.connected);
-    // connected=false aqui NÃO é falha — as creds podem "pegar" só no próximo reconnect
-    // completo do destino (~1-2 min). A origem já foi liberada, então nada a reverter.
-    push('verify', connected ? 'destino conectado' : 'destino ainda conectando (~1-2 min)');
-    if (!connected) push('destino-conectando');
+    push('verify', connected ? 'destino conectado' : 'destino não confirmou conexão');
+    if (!connected) {
+      throw new MigrateError(
+        'DESTINATION_NOT_READY',
+        'WAHA não confirmou a sessão; a origem será restaurada automaticamente'
+      );
+    }
+
+    if (typeof fromAdapter.commitMigration === 'function') {
+      await fromAdapter.commitMigration(fromCtx, from.id, {
+        api: to.api,
+        id: toId,
+      });
+      push('commit-origem', 'WAHA assumiu a sessão; restauração automática do Baileys bloqueada');
+    }
 
     return {
       success: true,
@@ -295,6 +319,34 @@ async function run(registry, body) {
       tier,
       steps,
     };
+  } catch (error) {
+    if (!sourceReleased && destinationCreated && toId) {
+      try {
+        if (typeof toAdapter.releaseForMigration === 'function') {
+          await toAdapter.releaseForMigration(toCtx, toId);
+        }
+      } catch (cleanupError) {
+        util.errlog('migrate: limpeza do destino vazio falhou', cleanupError && cleanupError.message);
+      }
+    }
+    if (sourceReleased) {
+      try {
+        if (toId && typeof toAdapter.releaseForMigration === 'function') {
+          await toAdapter.releaseForMigration(toCtx, toId);
+        }
+      } catch (cleanupError) {
+        util.errlog('migrate: limpeza do destino falhou no rollback', cleanupError && cleanupError.message);
+      }
+      try {
+        if (typeof fromAdapter.rollbackMigration === 'function') {
+          await fromAdapter.rollbackMigration(fromCtx, from.id);
+          push('rollback-origem', 'Baileys restaurado automaticamente');
+        }
+      } catch (rollbackError) {
+        util.errlog('migrate: rollback da origem falhou', rollbackError && rollbackError.message);
+      }
+    }
+    throw error;
   } finally {
     // Sempre liberar o lock — inclusive em erro/rollback.
     if (lockKey) locks.delete(lockKey);

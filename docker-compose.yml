@@ -133,11 +133,15 @@ services:
   broker:
     build: { context: ./broker }
     image: zdgzpro/wa-hub-broker:local
+    env_file:
+      - ${MENTORIAN_GATEWAY_ENV_FILE:-../mentorian-app/services/whatsapp-baileys-gateway/.env}
     environment:
       PORT: 8090
       HUB_SECRET: ${HUB_SECRET}
       HUB_MUTATIONS_ENABLED: ${HUB_MUTATIONS_ENABLED:-false}
       HUB_STATIC_UI_ENABLED: ${HUB_STATIC_UI_ENABLED:-false}
+      MENTORIAN_MIGRATIONS_ENABLED: ${MENTORIAN_MIGRATIONS_ENABLED:-false}
+      MENTORIAN_GATEWAY_URL: ${MENTORIAN_GATEWAY_URL:-http://mentorian-whatsapp-baileys-gateway:8787}
       # Evolution
       EVO_API_URL: "http://evolution:8080"
       EVO_API_KEY: ${EVO_GLOBAL_KEY}
@@ -191,7 +195,9 @@ services:
         condition: service_started
       waha:
         condition: service_started
-    networks: [wa-hub-net]
+    networks:
+      - wa-hub-net
+      - mentorian-gateway-net
     restart: unless-stopped
 
 volumes:
@@ -202,3 +208,6 @@ volumes:
 networks:
   wa-hub-net:
     driver: bridge
+  mentorian-gateway-net:
+    external: true
+    name: whatsapp-baileys-gateway_default
