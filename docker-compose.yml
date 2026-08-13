@@ -104,6 +104,8 @@ services:
     image: ${WUZAPI_IMAGE:-wuzapi:hub}
     environment:
       WUZAPI_ADMIN_TOKEN: ${WUZAPI_ADMIN_TOKEN}
+      WUZAPI_GLOBAL_ENCRYPTION_KEY: ${WUZAPI_GLOBAL_ENCRYPTION_KEY}
+      WUZAPI_GLOBAL_HMAC_KEY: ${WUZAPI_GLOBAL_HMAC_KEY}
       DB_USER: postgres
       DB_PASSWORD: ${PG_PASSWORD}
       DB_NAME: wuzapi
@@ -134,6 +136,8 @@ services:
     environment:
       PORT: 8090
       HUB_SECRET: ${HUB_SECRET}
+      HUB_MUTATIONS_ENABLED: ${HUB_MUTATIONS_ENABLED:-false}
+      HUB_STATIC_UI_ENABLED: ${HUB_STATIC_UI_ENABLED:-false}
       # Evolution
       EVO_API_URL: "http://evolution:8080"
       EVO_API_KEY: ${EVO_GLOBAL_KEY}
@@ -161,8 +165,21 @@ services:
     volumes:
       - waha_sessions:/waha-sessions                  # compartilha o volume da WAHA p/ inject NOWEB
       - broker_config:/config                         # runtime-config.json (sobrevive a rebuild)
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     ports:
       - "127.0.0.1:8090:8090"                         # ÚNICA porta exposta (bind local; remoto = Traefik + HUB_SECRET)
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8090/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy

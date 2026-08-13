@@ -25,6 +25,17 @@ function requireSecret(secret) {
   };
 }
 
+// Bloqueia toda operacao que possa criar QR, conectar, enviar, importar,
+// desconectar, excluir ou migrar enquanto a instalacao estiver em modo seguro.
+function requireMutationsEnabled(enabled) {
+  return function (_req, res, next) {
+    if (!enabled) {
+      return res.status(503).json({ error: 'MUTATIONS_DISABLED' });
+    }
+    return next();
+  };
+}
+
 // HTTP JSON com timeout (fetch nativo, Node >= 18). Devolve { ok, status, data }.
 // headers extras permitem esquemas de auth diferentes de `apikey` (ex.: token, X-Api-Key).
 async function httpJson(method, url, { apikey, headers, body, timeoutMs = 30000 } = {}) {
@@ -136,6 +147,7 @@ module.exports = {
   qrPngDataUri,
   timingSafeEqualStr,
   requireSecret,
+  requireMutationsEnabled,
   httpJson,
   jidToNumber,
   NotSupportedError,
