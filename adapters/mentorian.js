@@ -96,6 +96,22 @@ module.exports = {
     return { passport: passport.baileysCredsToPassport(creds) };
   },
 
+  async createSession(_ctx, name) {
+    return { id: String(name) };
+  },
+
+  async importPassport(ctx, id, dump) {
+    const creds = passport.buildBaileysCredsFromWebDump(dump);
+    const serialized = JSON.parse(JSON.stringify(creds, passport.bufferJsonReplacer));
+    const result = await call(ctx, String(id), 'migration/import', { creds: serialized });
+    return { id: String(id), jid: result && result.jid };
+  },
+
+  async setWebhook() {
+    // O gateway Mentorian possui webhook assinado fixo por configuração.
+    return { ok: true };
+  },
+
   async releaseForMigration(ctx, id) {
     await call(ctx, String(id), 'migration/release');
   },

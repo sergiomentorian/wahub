@@ -303,6 +303,137 @@ app.post('/mentorian/migrate-to-waha', async (req, res) => {
   }
 });
 
+// Contrato privado do MentorOps: seleção bidirecional entre os dois motores
+// homologados. Nunca aceita APIs arbitrárias enviadas pelo navegador.
+app.post('/mentorian/migrate-provider', async (req, res) => {
+  if (!mentorianMigrationsEnabled) {
+    return res.status(503).json({ error: 'MENTORIAN_MIGRATIONS_DISABLED' });
+  }
+  const workspaceId = String((req.body && req.body.workspaceId) || '').trim();
+  const from = String((req.body && req.body.from) || '');
+  const to = String((req.body && req.body.to) || '');
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(workspaceId) || !['baileys', 'waha'].includes(from) || !['baileys', 'waha'].includes(to) || from === to) {
+    return res.status(400).json({ error: 'BAD_REQUEST', message: 'Seleção de provedor inválida' });
+  }
+  const migrate = require('./migrate');
+  try {
+    const result = await migrate.run(registry, {
+      from: from === 'baileys'
+        ? { api: 'mentorian', id: workspaceId }
+        : { api: 'waha', id: workspaceId },
+      to: to === 'baileys'
+        ? { api: 'mentorian', id: workspaceId }
+        : { api: 'waha', name: workspaceId },
+      webhook: to === 'waha' ? req.body.webhook : null,
+      tier: 1,
+    });
+    res.json(result);
+  } catch (e) {
+    if (e instanceof migrate.MigrateError) {
+      return res.status(e.status || 500).json({ error: e.code, message: e.message });
+    }
+    util.errlog('Mentorian provider migration failed', e && e.name);
+    res.status(500).json({ error: 'MIGRATE_FAILED' });
+  }
+});
+
+app.post('/mentorian/configure-waha', async (req, res) => {
+  const workspaceId = mentorianWorkspaceId(req, res);
+  if (!workspaceId) return;
+  const entry = registry.waha;
+  try {
+    await entry.adapter.setWebhook(entry.ctx, workspaceId, req.body && req.body.webhook);
+    const status = await entry.adapter.status(entry.ctx, workspaceId);
+    res.json({ ok: status.connected === true, connected: status.connected === true, status: status.connected ? 'WORKING' : 'STOPPED' });
+  } catch (e) {
+    util.errlog('Mentorian WAHA webhook configuration failed', e && e.name);
+    res.status(502).json({ error: 'WAHA_CONFIGURATION_FAILED' });
+  }
+});
+
+app.post('/mentorian/waha-status', async (req, res) => {
+  const workspaceId = mentorianWorkspaceId(req, res);
+  if (!workspaceId) return;
+  const status = await registry.waha.adapter.status(registry.waha.ctx, workspaceId);
+  res.json({
+    ok: true,
+    connected: status.connected === true,
+    status: status.connected ? 'WORKING' : 'STOPPED',
+    phone: util.jidToNumber(status.jid),
+  });
+});
+
+app.post('/mentorian/waha-send', async (req, res) => {
+  const workspaceId = mentorianWorkspaceId(req, res);
+  if (!workspaceId) return;
+  try {
+    const result = await registry.waha.adapter.sendText(
+      registry.waha.ctx,
+      workspaceId,
+      req.body && req.body.phone,
+      req.body && req.body.text,
+    );
+    res.json(result);
+  } catch (e) {
+    util.errlog('Mentorian WAHA send failed', e && e.name);
+    res.status(502).json({ error: 'WAHA_SEND_FAILED' });
+  }
+});
+
+app.post('/mentorian/waha-send-media', async (req, res) => {
+  const workspaceId = mentorianWorkspaceId(req, res);
+  if (!workspaceId) return;
+  try {
+    const result = await registry.waha.adapter.sendMedia(
+      registry.waha.ctx,
+      workspaceId,
+      {
+        to: req.body && req.body.phone,
+        kind: req.body && req.body.kind,
+        mediaUrl: req.body && req.body.mediaUrl,
+        mimeType: req.body && req.body.mimeType,
+        fileName: req.body && req.body.fileName,
+        caption: req.body && req.body.caption,
+        ptt: req.body && req.body.ptt,
+      },
+    );
+    res.json(result);
+  } catch (e) {
+    util.errlog('Mentorian WAHA media send failed', e && e.name);
+    res.status(502).json({ error: 'WAHA_MEDIA_SEND_FAILED' });
+  }
+});
+
+app.post('/mentorian/waha-presence', async (req, res) => {
+  const workspaceId = mentorianWorkspaceId(req, res);
+  if (!workspaceId) return;
+  try {
+    const result = await registry.waha.adapter.setPresence(
+      registry.waha.ctx,
+      workspaceId,
+      req.body && req.body.phone,
+      req.body && req.body.state,
+    );
+    res.json(result);
+  } catch (e) {
+    util.errlog('Mentorian WAHA presence failed', e && e.name);
+    res.status(502).json({ error: 'WAHA_PRESENCE_FAILED' });
+  }
+});
+
+function mentorianWorkspaceId(req, res) {
+  if (!mentorianMigrationsEnabled || !registry.waha) {
+    res.status(503).json({ error: 'MENTORIAN_WAHA_DISABLED' });
+    return null;
+  }
+  const workspaceId = String((req.body && req.body.workspaceId) || '').trim();
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(workspaceId)) {
+    res.status(400).json({ error: 'BAD_REQUEST', message: 'workspaceId invalido' });
+    return null;
+  }
+  return workspaceId;
+}
+
 // ── POST /:api/restart?id=<s> — regenera o QR (reinicia a sessão) ──────────────
 app.post('/:api/restart', util.requireMutationsEnabled(mutationsEnabled), async (req, res) => {
   const entry = requireApi(req, res);
