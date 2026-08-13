@@ -120,7 +120,12 @@ services:
     restart: unless-stopped
 
   waha:
-    image: ${WAHA_IMAGE:-devlikeapro/waha:noweb-2026.7.1}   # variante NOWEB (engine da stack); tag = <variante>-<versao>
+    build:
+      context: .
+      dockerfile: waha-noweb/Dockerfile
+      args:
+        WAHA_BASE_IMAGE: ${WAHA_IMAGE:-devlikeapro/waha:noweb-2026.7.1}
+    image: ${WAHA_RUNTIME_IMAGE:-mentorian/waha-noweb:2026.7.1-baileys-rc14}
     # WAHA roda como root, enquanto o broker endurecido roda como uid/gid 1000.
     # Mantemos o volume privado, mas compartilhamos a escrita pelo grupo 1000:
     # sem isso, uma sessao criada pelo WAHA nasce root:root/0755 e o broker nao
