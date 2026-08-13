@@ -349,6 +349,38 @@ module.exports = {
     return { passport: passport.baileysCredsToPassport(creds) };
   },
 
+  // Copia as chaves de sinal do multi-file auth NOWEB. Somente creds.json nao e
+  // suficiente para uma troca de motor com a sessao ja em uso.
+  async exportStore(ctx, id) {
+    const s = String(id);
+    assertNoweb(ctx, 'exportStore');
+    const dir = path.dirname(credsPath(ctx, s));
+    const entries = {};
+    let files;
+    try {
+      files = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (error) {
+      throw new passport.CredsError(
+        'SESSION_NOT_FOUND',
+        `WAHA nao conseguiu listar o auth state de "${s}": ${(error && error.message) || error}`
+      );
+    }
+    for (const file of files) {
+      if (!file.isFile() || !file.name.endsWith('.json') || file.name === 'creds.json') continue;
+      try {
+        const field = file.name.slice(0, -'.json'.length);
+        entries[field] = JSON.parse(
+          fs.readFileSync(path.join(dir, file.name), 'utf8'),
+          passport.bufferJsonReviver,
+        );
+      } catch (error) {
+        util.errlog(`[waha] exportStore ignorou ${file.name}: ${(error && error.message) || error}`);
+      }
+    }
+    util.log(`[waha] exportStore(${s}): ${Object.keys(entries).length} chaves copiadas.`);
+    return { format: 'baileys-key-map-v1', entries };
+  },
+
   // ── setWebhook ────────────────────────────────────────────────────────────────
   // PUT {apiUrl}/api/sessions/{s} { config:{ webhooks:[{ url, events }] } }. Best-effort.
   async setWebhook(ctx, id, webhook) {

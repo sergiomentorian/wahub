@@ -124,6 +124,77 @@ test('Mentorian to Evolution registers the webhook and commits after connection'
   ]);
 });
 
+test('same-family migration imports signal keys before activating Evolution', async () => {
+  const calls = [];
+  let sourceReleased = false;
+  let destinationActivated = false;
+  const registry = {
+    waha: {
+      ctx: {},
+      adapter: {
+        family: 'baileys',
+        async status() {
+          return sourceReleased
+            ? { connected: false }
+            : { connected: true, jid: '5511999999999:1@s.whatsapp.net' };
+        },
+        async exportPassport() {
+          calls.push('export-passport');
+          return { passport: passportFixture() };
+        },
+        async exportStore() {
+          calls.push('export-store');
+          return { format: 'baileys-key-map-v1', entries: { 'pre-key-1': { keyId: 1 } } };
+        },
+        async releaseForMigration() {
+          sourceReleased = true;
+          calls.push('release-source');
+        },
+        async importPassport() {
+          calls.push('rollback-source');
+        },
+      },
+    },
+    evolution: {
+      ctx: {},
+      adapter: {
+        family: 'baileys',
+        async list() { return []; },
+        async createSession() { return { id: 'workspace-123' }; },
+        async importPassport() {
+          calls.push('import-passport');
+          return { ok: true, requiresActivation: true };
+        },
+        async importStore(_ctx, _id, blob) {
+          assert.equal(blob.entries['pre-key-1'].keyId, 1);
+          calls.push('import-store');
+        },
+        async activateImportedSession() {
+          destinationActivated = true;
+          calls.push('activate');
+        },
+        async status() { return { connected: destinationActivated }; },
+      },
+    },
+  };
+
+  const result = await migrate.run(registry, {
+    from: { api: 'waha', id: 'workspace-123' },
+    to: { api: 'evolution', name: 'workspace-123' },
+    tier: 2,
+  });
+
+  assert.equal(result.connected, true);
+  assert.deepEqual(calls, [
+    'export-passport',
+    'export-store',
+    'release-source',
+    'import-passport',
+    'import-store',
+    'activate',
+  ]);
+});
+
 test('Evolution destinations receive a longer readiness window', () => {
   assert.equal(migrate.destinationReadyTimeoutMs('waha', 'evolution'), 75000);
   assert.equal(migrate.destinationReadyTimeoutMs('mentorian', 'evolution'), 90000);

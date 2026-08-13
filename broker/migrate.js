@@ -352,6 +352,11 @@ async function run(registry, body) {
       }
     }
 
+    if (imp && imp.requiresActivation && typeof toAdapter.activateImportedSession === 'function') {
+      await toAdapter.activateImportedSession(toCtx, toId);
+      push('activate', 'sessao importada ativada depois do store');
+    }
+
     // ── PASSO 7: WEBHOOK no destino — DEPOIS do import (não antes) ──────────────
     // [FIX] O setWebhook do EvoGo faz /instance/connect. Rodando ANTES do import, ele
     // conectava a instância recém-criada quando ela ainda apontava p/ um jid ANTIGO

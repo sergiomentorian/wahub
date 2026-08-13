@@ -39,7 +39,7 @@ test('createSession refuses to overwrite an active Evolution instance', async (t
   );
 });
 
-test('importPassport falls back to connect when Evolution restart returns error in HTTP 200', async (t) => {
+test('importPassport defers activation and then falls back to connect on restart error', async (t) => {
   const originalFetch = global.fetch;
   t.after(() => { global.fetch = originalFetch; });
 
@@ -94,9 +94,42 @@ test('importPassport falls back to connect when Evolution restart returns error 
   );
 
   assert.equal(result.ok, true);
+  assert.equal(result.requiresActivation, true);
   assert.equal(queries.some((sql) => sql.includes('INSERT INTO "Session"')), true);
+  assert.deepEqual(requests, []);
+
+  await adapter.activateImportedSession(
+    { apiUrl: 'https://evolution.example.com', apiKey: 'secret' },
+    'workspace-123',
+  );
   assert.deepEqual(
     requests.map((request) => request.url.replace('https://evolution.example.com', '')),
     ['/instance/restart/workspace-123', '/instance/connect/workspace-123'],
   );
+});
+
+test('importStore writes Baileys keys to the Evolution instance Redis hash', async () => {
+  const calls = [];
+  const ctx = {
+    redisUri: 'redis://example.invalid',
+    redisPrefix: 'evolution',
+    redis: {
+      async del(key) { calls.push(['del', key]); },
+      async hset(key, ...values) { calls.push(['hset', key, ...values]); },
+    },
+    pool: {
+      async query() { return { rows: [{ id: 'instance-cuid' }] }; },
+    },
+  };
+
+  await adapter.importStore(ctx, 'workspace-123', {
+    format: 'baileys-key-map-v1',
+    entries: { 'pre-key-1': { keyId: 1, keyData: Buffer.from('key') } },
+  });
+
+  assert.deepEqual(calls[0], ['del', 'evolution:instance:instance-cuid']);
+  assert.equal(calls[1][0], 'hset');
+  assert.equal(calls[1][1], 'evolution:instance:instance-cuid');
+  assert.equal(calls[1][2], 'pre-key-1');
+  assert.match(calls[1][3], /"keyId":1/);
 });

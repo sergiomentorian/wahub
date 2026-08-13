@@ -86,6 +86,11 @@ function isSuccessfulEvolutionResponse(response) {
   );
 }
 
+function evolutionAuthRedisKey(ctx, sessionId) {
+  const prefix = String((ctx && ctx.redisPrefix) || 'evolution').replace(/:+$/, '');
+  return `${prefix}:instance:${sessionId}`;
+}
+
 module.exports = {
   id: 'evolution',
   family: 'baileys',
@@ -264,11 +269,14 @@ module.exports = {
       client.release();
     }
 
-    // Sobe a sessao ao vivo (sem QR). Se a instancia JA estava rodando/ciclando QR, o
-    // /instance/connect NAO relê as creds do banco → forcamos um RESTART (recarrega o auth
-    // do DB com as creds injetadas e conecta). A Evolution responde HTTP 200 mesmo quando
-    // o controller devolve { error:true }; nesse caso o restart NAO ocorreu e precisamos
-    // chamar /connect para criar o cliente lendo as credenciais novas do banco.
+    // A ativacao e deliberadamente adiada para DEPOIS do importStore. Credenciais sem as
+    // chaves de sinal podem iniciar o socket, mas ele cai antes de concluir a migracao.
+    const jid = p.me && p.me.id ? p.me.id : null;
+    return { ok: true, jid, requiresActivation: true };
+  },
+
+  async activateImportedSession(ctx, id) {
+    const name = String(id);
     let restart = null;
     try {
       restart = await util.httpJson('POST', `${ctx.apiUrl}/instance/restart/${encodeURIComponent(name)}`, { apikey: ctx.apiKey });
@@ -291,8 +299,7 @@ module.exports = {
       }
     }
 
-    const jid = p.me && p.me.id ? p.me.id : null;
-    return { ok: true, jid };
+    return { ok: true };
   },
 
   // ── exportPassport ────────────────────────────────────────────────────────────
@@ -527,12 +534,11 @@ module.exports = {
     ctx.redis = new Redis(ctx.redisUri, {
       lazyConnect: false,
       maxRetriesPerRequest: 2,
-      keyPrefix: ctx.redisPrefix || undefined,
     });
     return ctx.redis;
   },
 
-  // exportStore: SCAN por substring dos tipos de chave de sinal e devolve { key: value }.
+  // Evolution 2.3.7 guarda o auth state num HASH Redis por Instance.id.
   async exportStore(ctx, id) {
     const name = String(id);
     const redis = this._getRedis(ctx);
@@ -541,51 +547,23 @@ module.exports = {
       return {};
     }
 
-    // [AUDIT] confirmar padrao de chaves do Evolution no Redis no teste ao vivo.
-    // O layout exato e INCERTO — filtramos por SUBSTRING dos tipos conhecidos (defensivo).
-    const typeSubstrings = [
-      'pre-key',
-      'prekey',
-      'session',
-      'sender-key',
-      'senderkey',
-      'app-state-sync-key',
-      'app-state-sync-version',
-      'appstate',
-    ];
-    const nameLc = name.toLowerCase();
-
-    const out = {};
-    let scanned = 0;
-    let copied = 0;
-    let cursor = '0';
-    do {
-      // MATCH generoso (*name*) reduz o universo antes do filtro fino por substring de tipo.
-      const [next, keys] = await redis.scan(cursor, 'MATCH', `*${name}*`, 'COUNT', 500);
-      cursor = next;
-      for (const key of keys) {
-        scanned += 1;
-        const kLc = String(key).toLowerCase();
-        // exige o nome da instancia + um dos tipos de chave de sinal.
-        if (!kLc.includes(nameLc)) continue;
-        if (!typeSubstrings.some((t) => kLc.includes(t))) continue;
-        try {
-          const val = await redis.get(key);
-          if (val != null) {
-            out[key] = val;
-            copied += 1;
-          }
-        } catch (_e) {
-          /* chave pode nao ser string (hash/set) — ignora no best-effort */
-        }
+    const inst = await ctx.pool.query('SELECT id FROM "Instance" WHERE name = $1', [name]);
+    if (!inst.rows.length) return { format: 'baileys-key-map-v1', entries: {} };
+    const redisKey = evolutionAuthRedisKey(ctx, inst.rows[0].id);
+    const raw = await redis.hgetall(redisKey);
+    const entries = {};
+    for (const [field, value] of Object.entries(raw || {})) {
+      try {
+        entries[field] = JSON.parse(value, passport.bufferJsonReviver);
+      } catch (_error) {
+        /* field corrompido nao invalida o restante do auth state */
       }
-    } while (cursor !== '0');
-
-    util.log(`[evolution] exportStore(${name}): ${copied} chaves copiadas (de ${scanned} varridas).`);
-    return out;
+    }
+    util.log(`[evolution] exportStore(${name}): ${Object.keys(entries).length} chaves copiadas.`);
+    return { format: 'baileys-key-map-v1', entries };
   },
 
-  // importStore: MSET de volta o blob {key:value}. Best-effort.
+  // Reconstroi o HASH exato consumido pelo CacheService da Evolution.
   async importStore(ctx, id, blob) {
     const name = String(id);
     const redis = this._getRedis(ctx);
@@ -597,17 +575,25 @@ module.exports = {
       util.log(`[evolution] importStore(${name}): blob vazio/invalido, nada a fazer.`);
       return;
     }
-    // [AUDIT] confirmar padrao de chaves do Evolution no Redis no teste ao vivo.
-    const entries = Object.entries(blob).filter(([k, v]) => k != null && v != null);
+    const sourceEntries = blob.format === 'baileys-key-map-v1' ? blob.entries : blob;
+    const entries = Object.entries(sourceEntries || {}).filter(([k, v]) => k != null && v != null);
     if (!entries.length) {
       util.log(`[evolution] importStore(${name}): 0 pares validos.`);
       return;
     }
+    const inst = await ctx.pool.query('SELECT id FROM "Instance" WHERE name = $1', [name]);
+    if (!inst.rows.length) {
+      throw new passport.CredsError('INSTANCE_NOT_FOUND', `Instance "${name}" nao existe`);
+    }
+    const redisKey = evolutionAuthRedisKey(ctx, inst.rows[0].id);
     const flat = [];
-    for (const [k, v] of entries) flat.push(String(k), String(v));
+    for (const [field, value] of entries) {
+      flat.push(String(field), JSON.stringify(value, passport.bufferJsonReplacer));
+    }
     try {
-      await redis.mset(...flat);
-      util.log(`[evolution] importStore(${name}): ${entries.length} chaves restauradas via MSET.`);
+      await redis.del(redisKey);
+      await redis.hset(redisKey, ...flat);
+      util.log(`[evolution] importStore(${name}): ${entries.length} chaves restauradas.`);
     } catch (e) {
       util.errlog(`[evolution] importStore(${name}) MSET falhou: ${(e && e.message) || e}`);
     }

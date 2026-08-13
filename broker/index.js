@@ -329,7 +329,7 @@ app.post('/mentorian/migrate-provider', async (req, res) => {
         ? { api: MENTORIAN_PROVIDER_MAP[to], id: workspaceId }
         : { api: MENTORIAN_PROVIDER_MAP[to], name: workspaceId },
       webhook: to === 'waha' || to === 'evolution' ? req.body.webhook : null,
-      tier: 1,
+      tier: 2,
     });
     res.json(result);
   } catch (e) {
