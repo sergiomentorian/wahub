@@ -60,12 +60,50 @@ const STATUS_BY_CODE = {
 // [AUDIT] LOCK por-número em memória do módulo (mutex de processo). Chave = número
 // (jid->dígitos). Persiste enquanto o processo vive; liberado no finally de run().
 const locks = new Set();
+const MENTORIAN_SOURCE_READY_TIMEOUT_MS = 20000;
+const MENTORIAN_SOURCE_READY_INTERVAL_MS = 1000;
 
 // Resolve uma entry do registry por id EXATO (evogo != evo — nunca includes).
 function resolveEntry(registry, api) {
   const entry = registry && registry[api];
   if (!entry || !entry.adapter || entry.ctx === undefined) return null;
   return entry;
+}
+
+function isMentorianSourceTemporarilyDisconnected(error) {
+  return Boolean(
+    error &&
+      (error.code === 'migration_source_not_connected' ||
+        (error.status === 409 && /not connected|nao esta conectada|não está conectada/i.test(String(error.message || ''))))
+  );
+}
+
+async function exportMentorianSourceWhenReady(
+  adapter,
+  ctx,
+  id,
+  {
+    timeoutMs = MENTORIAN_SOURCE_READY_TIMEOUT_MS,
+    intervalMs = MENTORIAN_SOURCE_READY_INTERVAL_MS,
+  } = {}
+) {
+  const startedAt = Date.now();
+  let lastError = null;
+
+  do {
+    try {
+      return await adapter.exportPassport(ctx, id);
+    } catch (error) {
+      if (!isMentorianSourceTemporarilyDisconnected(error)) throw error;
+      lastError = error;
+    }
+
+    const remainingMs = timeoutMs - (Date.now() - startedAt);
+    if (remainingMs <= 0) break;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, remainingMs)));
+  } while (Date.now() - startedAt < timeoutMs);
+
+  throw lastError || new Error('migration_source_not_connected');
 }
 
 async function run(registry, body) {
@@ -108,7 +146,36 @@ async function run(registry, body) {
   };
 
   // ── PASSO 1: status origem + derivar número + LOCK + DEDUP ─────────────────────
-  const st = await fromAdapter.status(fromCtx, from.id);
+  // O gateway persistente pode passar alguns segundos em reconexao mesmo com a
+  // credencial registrada. Para a origem Mentorian, o proprio export e o pre-check
+  // autoritativo: aguarda a sessao estabilizar e preserva esse snapshot para o passo 2.
+  let prefetchedSourceExport = null;
+  let st;
+  if (from.api === 'mentorian') {
+    try {
+      prefetchedSourceExport = await exportMentorianSourceWhenReady(
+        fromAdapter,
+        fromCtx,
+        from.id
+      );
+      st = {
+        connected: true,
+        jid:
+          prefetchedSourceExport &&
+          prefetchedSourceExport.passport &&
+          prefetchedSourceExport.passport.me
+            ? prefetchedSourceExport.passport.me.id
+            : null,
+      };
+    } catch (error) {
+      throw new MigrateError(
+        'SOURCE_NOT_READY',
+        `origem ${from.api} nao estabilizou para migracao (${(error && error.message) || error})`
+      );
+    }
+  } else {
+    st = await fromAdapter.status(fromCtx, from.id);
+  }
   const number = util.jidToNumber(st && st.jid);
   push('status-origem', 'origem ' + (st && st.connected ? 'conectada' : 'desconectada') + (number ? ', numero ' + number : ''));
 
@@ -168,7 +235,9 @@ async function run(registry, body) {
     // sessão local dela. uazapi (destino-only) lança NotSupportedError.
     let pass;
     try {
-      const res = await fromAdapter.exportPassport(fromCtx, from.id);
+      const res =
+        prefetchedSourceExport ||
+        (await fromAdapter.exportPassport(fromCtx, from.id));
       pass = res && res.passport;
     } catch (e) {
       if (e instanceof util.NotSupportedError || (e && e.code === 'NOT_SUPPORTED')) {
@@ -353,4 +422,9 @@ async function run(registry, body) {
   }
 }
 
-module.exports = { run, MigrateError, locks };
+module.exports = {
+  run,
+  MigrateError,
+  locks,
+  exportMentorianSourceWhenReady,
+};

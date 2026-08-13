@@ -136,3 +136,51 @@ test('WAHA import never starts when Mentorian source cannot be paused', async ()
     'release-destination',
   ]);
 });
+
+test('Mentorian pre-check waits through a transient reconnect before exporting', async () => {
+  let attempts = 0;
+  const expected = { passport: passportFixture() };
+  const adapter = {
+    async exportPassport() {
+      attempts += 1;
+      if (attempts < 3) {
+        const error = new Error('Conecte o WhatsApp no Baileys antes de iniciar a migração.');
+        error.code = 'migration_source_not_connected';
+        error.status = 409;
+        throw error;
+      }
+      return expected;
+    },
+  };
+
+  const result = await migrate.exportMentorianSourceWhenReady(
+    adapter,
+    {},
+    'workspace-123',
+    { timeoutMs: 50, intervalMs: 0 },
+  );
+
+  assert.equal(result, expected);
+  assert.equal(attempts, 3);
+});
+
+test('Mentorian pre-check does not retry a non-transient export failure', async () => {
+  let attempts = 0;
+  const adapter = {
+    async exportPassport() {
+      attempts += 1;
+      const error = new Error('invalid credentials');
+      error.code = 'credentials_invalid';
+      throw error;
+    },
+  };
+
+  await assert.rejects(
+    migrate.exportMentorianSourceWhenReady(adapter, {}, 'workspace-123', {
+      timeoutMs: 50,
+      intervalMs: 0,
+    }),
+    /invalid credentials/,
+  );
+  assert.equal(attempts, 1);
+});
