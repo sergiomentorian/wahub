@@ -27,6 +27,7 @@ const express = require('express');
 
 const util = require('./lib/util');
 const passport = require('./lib/passport');
+const { buildProviderInventory } = require('./lib/provider-inventory');
 
 // Ordem de tentativa de carga dos adapters. Cada arquivo pode ainda não existir
 // (criado em paralelo por outro agente) ou falhar no init → boot resiliente.
@@ -334,6 +335,18 @@ app.post('/mentorian/migrate-provider', async (req, res) => {
     }
     util.errlog('Mentorian provider migration failed', e && e.name);
     res.status(500).json({ error: 'MIGRATE_FAILED' });
+  }
+});
+
+// Inventário privado e sanitizado dos motores homologados pela Mentorian.
+// Não expõe sessões, números, credenciais ou provedores ainda não liberados no produto.
+app.post('/mentorian/provider-inventory', async (_req, res) => {
+  try {
+    const inventory = await buildProviderInventory({ registry, env: process.env });
+    res.json(inventory);
+  } catch (error) {
+    util.errlog('Mentorian provider inventory failed', error && error.name);
+    res.status(502).json({ error: 'PROVIDER_INVENTORY_FAILED' });
   }
 });
 

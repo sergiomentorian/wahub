@@ -73,6 +73,16 @@ module.exports = {
     return [];
   },
 
+  async readiness(ctx) {
+    const response = await fetch(`${ctx.apiUrl}/ready`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || data.ok !== true) return { ok: false };
+    return data;
+  },
+
   async status(ctx, id) {
     let result;
     try {
