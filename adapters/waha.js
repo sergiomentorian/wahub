@@ -215,9 +215,23 @@ module.exports = {
       body: { name: nm, start: false },
     });
     if (!r.ok) {
+      const detail = JSON.stringify(r.data || {});
+      // Uma tentativa anterior pode ter criado a sessao e falhado antes do
+      // import. Reutilizar apenas uma sessao comprovadamente parada torna o
+      // botao idempotente sem apagar, deslogar ou gerar um novo QR Code.
+      if (r.status === 422 && /already exists/i.test(detail)) {
+        const existing = await util.httpJson(
+          'GET',
+          `${ctx.apiUrl}/api/sessions/${encodeURIComponent(nm)}`,
+          { headers: authHeaders(ctx) },
+        );
+        if (existing.ok && readStatus(existing.data) === 'STOPPED') {
+          return { id: nm, name: nm, reused: true };
+        }
+      }
       throw new passport.CredsError(
         'CREATE_FAILED',
-        `WAHA POST /api/sessions status=${r.status} detail=${JSON.stringify(r.data)}`
+        `WAHA POST /api/sessions status=${r.status} detail=${detail}`
       );
     }
     const created = (r.data && (r.data.name || (r.data.session && r.data.session.name))) || nm;
