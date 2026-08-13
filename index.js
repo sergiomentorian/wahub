@@ -30,7 +30,7 @@ const passport = require('./lib/passport');
 
 // Ordem de tentativa de carga dos adapters. Cada arquivo pode ainda não existir
 // (criado em paralelo por outro agente) ou falhar no init → boot resiliente.
-const ADAPTER_NAMES = ['evolution', 'evogo', 'wuzapi', 'waha', 'uazapi'];
+const ADAPTER_NAMES = ['mentorian', 'evolution', 'evogo', 'wuzapi', 'waha', 'uazapi'];
 
 // REGISTRY keyed por id EXATO do adapter: { [id]: { adapter, ctx } }.
 const registry = {};
@@ -42,12 +42,14 @@ const modules = {};
 const secret = process.env.HUB_SECRET || '';
 const mutationsEnabled = process.env.HUB_MUTATIONS_ENABLED === 'true';
 const staticUiEnabled = process.env.HUB_STATIC_UI_ENABLED === 'true';
+const mentorianMigrationsEnabled = process.env.MENTORIAN_MIGRATIONS_ENABLED === 'true';
 
 // ── Config runtime por API (suporta instalações EXTERNAS à stack) ──────────────
 // Campos genéricos -> env vars que cada adapter lê no init(). O overlay parte de
 // process.env (padrão da stack) e SÓ sobrescreve o que foi configurado — sem
 // campo extra o comportamento é idêntico ao default (sem regressão).
 const CONFIG_FIELD_MAP = {
+  mentorian:  { apiUrl: 'MENTORIAN_GATEWAY_URL', token: 'MENTORIAN_GATEWAY_SHARED_SECRET' },
   uazapi:    { apiUrl: 'UAZAPI_API_URL', token: 'UAZAPI_ADMIN_TOKEN' },
   waha:      { apiUrl: 'WAHA_API_URL', token: 'WAHA_API_KEY', sessionsDir: 'WAHA_SESSIONS_DIR', engine: 'WAHA_ENGINE' },
   evolution: { apiUrl: 'EVO_API_URL', token: 'EVO_API_KEY', databaseUri: 'EVO_DATABASE_URI', redisUri: 'EVO_REDIS_URI', redisPrefix: 'EVO_REDIS_PREFIX', dbSchema: 'EVO_DB_SCHEMA' },
@@ -271,6 +273,33 @@ app.post('/migrate', util.requireMutationsEnabled(mutationsEnabled), async (req,
     }
     util.errlog('POST /migrate falhou', e && e.message, e && e.stack);
     res.status(500).json({ error: 'MIGRATE_FAILED', message: e && e.message });
+  }
+});
+
+// Escopo estreito usado pelo MentorOps: somente Mentorian Baileys -> WAHA.
+// Mantem as demais mutacoes do WAHub bloqueadas no ambiente Mentorian.
+app.post('/mentorian/migrate-to-waha', async (req, res) => {
+  if (!mentorianMigrationsEnabled) {
+    return res.status(503).json({ error: 'MENTORIAN_MIGRATIONS_DISABLED' });
+  }
+  const workspaceId = String((req.body && req.body.workspaceId) || '').trim();
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(workspaceId)) {
+    return res.status(400).json({ error: 'BAD_REQUEST', message: 'workspaceId invalido' });
+  }
+  const migrate = require('./migrate');
+  try {
+    const result = await migrate.run(registry, {
+      from: { api: 'mentorian', id: workspaceId },
+      to: { api: 'waha', name: workspaceId },
+      tier: 1,
+    });
+    res.json(result);
+  } catch (e) {
+    if (e instanceof migrate.MigrateError) {
+      return res.status(e.status || 500).json({ error: e.code, message: e.message });
+    }
+    util.errlog('Mentorian -> WAHA falhou', e && e.name);
+    res.status(500).json({ error: 'MIGRATE_FAILED' });
   }
 });
 
