@@ -381,7 +381,24 @@ module.exports = {
       const inst = unwrapInstanceItem((r && r.data) || {});
       const state = readState(inst);
       const jid = readOwnerJid(inst) || null;
-      return { connected: state === 'open', jid };
+      let persisted = null;
+      if (state !== 'open' && ctx.pool) {
+        const result = await ctx.pool.query(
+          'SELECT "connectionStatus", "disconnectionReasonCode" FROM "Instance" WHERE name = $1',
+          [name],
+        );
+        persisted = result.rows[0] || null;
+      }
+      const persistedState = readState(persisted);
+      const reasonCode = persisted && persisted.disconnectionReasonCode != null
+        ? Number(persisted.disconnectionReasonCode)
+        : null;
+      return {
+        connected: state === 'open',
+        jid,
+        state: state || persistedState || 'unknown',
+        reasonCode: Number.isFinite(reasonCode) ? reasonCode : null,
+      };
     } catch (e) {
       util.errlog(`[evolution] status falhou name=${name}: ${(e && e.message) || e}`);
       return { connected: false, jid: null };
@@ -594,6 +611,7 @@ module.exports = {
       await redis.del(redisKey);
       await redis.hset(redisKey, ...flat);
       util.log(`[evolution] importStore(${name}): ${entries.length} chaves restauradas.`);
+      return { importedKeys: entries.length, redisKey };
     } catch (e) {
       util.errlog(`[evolution] importStore(${name}) MSET falhou: ${(e && e.message) || e}`);
     }

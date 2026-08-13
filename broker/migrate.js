@@ -339,8 +339,14 @@ async function run(registry, body) {
     if (tier === 2) {
       if (storeBlob && hasStore) {
         try {
-          await toAdapter.importStore(toCtx, toId, storeBlob);
-          push('tier2-store', 'store completo copiado (Tier 2)');
+          const storeResult = await toAdapter.importStore(toCtx, toId, storeBlob);
+          const importedKeys = storeResult && Number(storeResult.importedKeys);
+          push(
+            'tier2-store',
+            Number.isFinite(importedKeys)
+              ? `store completo copiado (Tier 2, ${importedKeys} chaves)`
+              : 'store completo copiado (Tier 2)'
+          );
         } catch (e) {
           util.errlog('migrate: Tier 2 importStore falhou (segue Tier 1)', e && e.message);
           push('tier2-store', 'Tier 2 falhou, segue Tier 1: ' + (e && e.message));
@@ -390,9 +396,13 @@ async function run(registry, body) {
     const connected = !!(ok && ok.connected);
     push('verify', connected ? 'destino conectado' : 'destino não confirmou conexão');
     if (!connected) {
+      const lastStatus = await toAdapter.status(toCtx, toId).catch(() => null);
+      const diagnostic = lastStatus
+        ? ` (estado=${lastStatus.state || 'desconhecido'}, codigo=${lastStatus.reasonCode ?? 'n/d'})`
+        : '';
       throw new MigrateError(
         'DESTINATION_NOT_READY',
-        `${to.api} não confirmou a sessão; a origem será restaurada automaticamente`
+        `${to.api} não confirmou a sessão${diagnostic}; a origem será restaurada automaticamente`
       );
     }
 
