@@ -121,6 +121,20 @@ services:
 
   waha:
     image: ${WAHA_IMAGE:-devlikeapro/waha:noweb-2026.7.1}   # variante NOWEB (engine da stack); tag = <variante>-<versao>
+    # WAHA roda como root, enquanto o broker endurecido roda como uid/gid 1000.
+    # Mantemos o volume privado, mas compartilhamos a escrita pelo grupo 1000:
+    # sem isso, uma sessao criada pelo WAHA nasce root:root/0755 e o broker nao
+    # consegue injetar o creds.json da migracao sem QR Code.
+    command:
+      - sh
+      - -c
+      - >-
+        umask 0002 &&
+        mkdir -p /app/.sessions/noweb &&
+        chgrp -R 1000 /app/.sessions &&
+        chmod -R g+rwX /app/.sessions &&
+        find /app/.sessions -type d -exec chmod g+s {} + &&
+        exec /entrypoint.sh
     environment:
       WAHA_API_KEY: ${WAHA_API_KEY}
       WHATSAPP_DEFAULT_ENGINE: NOWEB                  # [AUDIT] NOWEB = alvo de injeção da v1
