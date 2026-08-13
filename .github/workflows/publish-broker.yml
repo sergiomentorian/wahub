@@ -27,4 +27,9 @@ jobs:
         with:
           context: ./broker
           push: true
-          tags: ghcr.io/sergiomentorian/wahub-broker:b53f056
+          tags: |
+            ghcr.io/sergiomentorian/wahub-broker:${{ github.sha }}
+            ghcr.io/sergiomentorian/wahub-broker:stable
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/sergiomentorian/wahub
