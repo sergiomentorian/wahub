@@ -193,14 +193,11 @@ services:
       UAZAPI_API_URL: ${UAZAPI_API_URL:-https://api.uazapi.com}
       UAZAPI_ADMIN_TOKEN: ${UAZAPI_ADMIN_TOKEN}
       BROKER_CONFIG_DIR: /config                      # config runtime persistida (instalações externas)
-      WHATSAPP_EGRESS_PROXY_MODE: ${WHATSAPP_EGRESS_PROXY_MODE:-disabled}
-      WHATSAPP_EGRESS_PROXY_CONFIG_FILE: /run/secrets/whatsapp-egress-proxies.json
+      WHATSAPP_EGRESS_PROXY_MODE: ${WHATSAPP_EGRESS_PROXY_MODE:-assigned}
+      WHATSAPP_EGRESS_PROXY_CONFIG_FILE: /config/egress-proxies.json
     volumes:
       - waha_sessions:/waha-sessions                  # compartilha o volume da WAHA p/ inject NOWEB
-      - broker_config:/config                         # runtime-config.json (sobrevive a rebuild)
-      - ${WHATSAPP_EGRESS_PROXY_CONFIG_HOST_FILE:-./config/egress-proxies.example.json}:/run/secrets/whatsapp-egress-proxies.json:ro
-    group_add:
-      - ${WHATSAPP_EGRESS_PROXY_GROUP_ID:-2000}
+      - broker_config:/config                         # runtime-config e inventário secreto de proxies
     read_only: true
     tmpfs:
       - /tmp

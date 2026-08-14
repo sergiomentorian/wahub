@@ -54,7 +54,20 @@ test('resolves one HTTP proxy per workspace and keeps public status secret-free'
 
   registry.start();
   const proxy = registry.resolve(workspaceId);
-  assert.deepEqual(proxy, {
+  assert.deepEqual(
+    {
+      id: proxy.id,
+      vendor: proxy.vendor,
+      country: proxy.country,
+      region: proxy.region,
+      protocol: proxy.protocol,
+      host: proxy.host,
+      port: proxy.port,
+      server: proxy.server,
+      username: proxy.username,
+      password: proxy.password,
+    },
+    {
     id: 'proxy-sp-01',
     vendor: 'ProxyAds',
     country: 'BR',
@@ -65,7 +78,8 @@ test('resolves one HTTP proxy per workspace and keeps public status secret-free'
     server: 'proxy.example.com:8080',
     username: 'cliente',
     password: 'senha-super-secreta',
-  });
+    },
+  );
   const publicStatus = JSON.stringify(registry.getStatus());
   assert.doesNotMatch(publicStatus, /senha-super-secreta/);
   assert.doesNotMatch(publicStatus, /proxy\.example\.com/);
@@ -87,6 +101,57 @@ test('fails closed when a workspace has no dedicated assignment', (t) => {
     (error) =>
       error instanceof EgressProxyError &&
       error.code === 'EGRESS_PROXY_ASSIGNMENT_MISSING',
+  );
+});
+
+test('assigned mode lets legacy workspaces use direct egress until a proxy is assigned', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-egress-assigned-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const registry = new EgressProxyRegistry({
+    mode: 'assigned',
+    configFile: writeConfig(directory),
+  });
+  registry.start();
+
+  assert.equal(
+    registry.resolve('00000000-0000-0000-0000-000000000002'),
+    null,
+  );
+});
+
+test('unassign keeps the purchased proxy available for reassignment', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-egress-stock-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const registry = new EgressProxyRegistry({
+    mode: 'assigned',
+    configFile: writeConfig(directory),
+  });
+  registry.start();
+
+  registry.remove(workspaceId);
+
+  assert.equal(registry.getWorkspaceStatus(workspaceId).assigned, false);
+  assert.equal(registry.listPublic().length, 1);
+  assert.equal(registry.listPublic()[0].assigned, false);
+  assert.doesNotMatch(JSON.stringify(registry.listPublic()), /senha-super-secreta/);
+});
+
+test('blocks a reconnect when the assigned proxy is marked offline', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-egress-offline-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configFile = writeConfig(directory);
+  const raw = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  raw.profiles['proxy-sp-01'].validationStatus = 'offline';
+  fs.writeFileSync(configFile, JSON.stringify(raw));
+  fs.chmodSync(configFile, 0o600);
+  const registry = new EgressProxyRegistry({ mode: 'assigned', configFile });
+  registry.start();
+
+  assert.throws(
+    () => registry.resolve(workspaceId),
+    (error) =>
+      error instanceof EgressProxyError &&
+      error.code === 'EGRESS_PROXY_UNAVAILABLE',
   );
 });
 

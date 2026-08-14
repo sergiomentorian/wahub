@@ -159,6 +159,115 @@ function requireApi(req, res) {
   return entry;
 }
 
+function sendEgressProxyError(res, error) {
+  const status = Number(error && error.status) || 503;
+  return res.status(status).json({
+    ok: false,
+    error: (error && error.code) || 'EGRESS_PROXY_FAILED',
+    message:
+      (error && error.message) ||
+      'Não foi possível concluir a operação da proxy de saída',
+  });
+}
+
+// ── Proxies de saída por workspace ────────────────────────────────────────────
+// O inventário público para o Console nunca contém host, usuário, senha ou IP.
+// A resolução completa existe somente para os gateways, atrás do HUB_SECRET.
+app.get('/egress-proxies', (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      status: egressProxyRegistry.getStatus(),
+      proxies: egressProxyRegistry.listPublic(),
+    });
+  } catch (error) {
+    sendEgressProxyError(res, error);
+  }
+});
+
+app.get('/egress-proxies/:workspaceId', (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      proxy: egressProxyRegistry.getWorkspaceStatus(req.params.workspaceId),
+    });
+  } catch (error) {
+    sendEgressProxyError(res, error);
+  }
+});
+
+app.post(
+  '/egress-proxies',
+  util.requireMutationsEnabled(mutationsEnabled),
+  async (req, res) => {
+    try {
+      const proxy = await egressProxyRegistry.register(req.body);
+      res.status(201).json({ ok: true, proxy });
+    } catch (error) {
+      sendEgressProxyError(res, error);
+    }
+  },
+);
+
+app.get('/internal/egress-proxies/:workspaceId', (req, res) => {
+  try {
+    const proxy = egressProxyRegistry.resolve(req.params.workspaceId);
+    if (!proxy) {
+      return res.status(404).json({
+        ok: false,
+        error: 'EGRESS_PROXY_ASSIGNMENT_MISSING',
+      });
+    }
+    res.json({
+      ok: true,
+      proxy: {
+        profileId: proxy.id,
+        protocol: proxy.protocol,
+        host: proxy.host,
+        port: proxy.port,
+        username: proxy.username,
+        password: proxy.password,
+        vendor: proxy.vendor,
+        country: proxy.country,
+        region: proxy.region,
+        expiresAt: proxy.expiresAt,
+        credentialFingerprint: proxy.credentialFingerprint,
+      },
+    });
+  } catch (error) {
+    sendEgressProxyError(res, error);
+  }
+});
+
+app.put(
+  '/egress-proxies/:workspaceId',
+  util.requireMutationsEnabled(mutationsEnabled),
+  async (req, res) => {
+    try {
+      const proxy = await egressProxyRegistry.assign(
+        req.params.workspaceId,
+        req.body,
+      );
+      res.json({ ok: true, proxy });
+    } catch (error) {
+      sendEgressProxyError(res, error);
+    }
+  },
+);
+
+app.delete(
+  '/egress-proxies/:workspaceId',
+  util.requireMutationsEnabled(mutationsEnabled),
+  (req, res) => {
+    try {
+      const proxy = egressProxyRegistry.remove(req.params.workspaceId);
+      res.json({ ok: true, proxy });
+    } catch (error) {
+      sendEgressProxyError(res, error);
+    }
+  },
+);
+
 // ── GET /sessions — lista UNIFICADA ────────────────────────────────────────────
 // Chama list() de cada API. [AUDIT] uma falha NÃO derruba as outras (try/catch por
 // API). Anexa api:id e number (item.number || jidToNumber(item.jid)) — number é a
@@ -679,6 +788,14 @@ async function boot() {
   // Em modo required, um arquivo ausente/inválido impede o broker de subir.
   // Assim nenhuma criação ou migração cai silenciosamente no IP direto da VPS.
   egressProxyRegistry.start();
+  if (egressProxyRegistry.mode !== 'disabled') {
+    const validationTimer = setInterval(() => {
+      void egressProxyRegistry.validateAll().catch(() => {
+        util.errlog('proxy egress: validação periódica encontrou indisponibilidade');
+      });
+    }, 5 * 60 * 1000);
+    validationTimer.unref();
+  }
 
   for (const name of ADAPTER_NAMES) {
     let adapter;

@@ -37,18 +37,17 @@ brasileiro dedicado, fixo e sem rotação para cada número/workspace ativo. A
 mesma atribuição acompanha a sessão nas migrações entre Mentorian Baileys, WAHA
 e Evolution; não compre um proxy adicional para cada provedor.
 
-O arquivo real fica fora do Git, por exemplo em
-`/etc/mentorian/whatsapp-egress-proxies.json`, proprietário `root`, grupo Linux
-dedicado e modo `0640`. A variável `WHATSAPP_EGRESS_PROXY_GROUP_ID` informa o
-GID desse grupo aos dois containers. A variável
-`WHATSAPP_EGRESS_PROXY_CONFIG_HOST_FILE` aponta para esse arquivo e o Compose o
-monta read-only em `/run/secrets/whatsapp-egress-proxies.json`.
+O inventário real fica no volume privado `broker_config`, no arquivo
+`/config/egress-proxies.json` com modo `0600`. O MentorOps cadastra a proxy pelo
+Hub e recebe apenas estado sanitizado; host, usuário, senha e IP de saída nunca
+voltam ao navegador nem aos logs. O cadastro só é salvo depois de um teste HTTPS
+real pelo próprio proxy.
 
-Mantenha `WHATSAPP_EGRESS_PROXY_MODE=disabled` antes da homologação. Em
-`required`, arquivo ausente/inválido, proxy compartilhado ou workspace sem
-atribuição bloqueiam criação e migração sem fallback pelo IP da VPS. Para o
-contrato comum de WAHA e Evolution use URL `http://usuario:senha@host:porta`;
-WAHA documenta proxy por sessão no formato `host:porta`.
+Use `WHATSAPP_EGRESS_PROXY_MODE=assigned` durante a implantação gradual: um
+workspace atribuído falha fechado, enquanto workspaces ainda sem proxy mantêm a
+saída legada. Em `required`, qualquer workspace sem atribuição é bloqueado. Uma
+proxy comprada é um ativo independente: pode ficar livre, ser vinculada e depois
+transferida entre workspaces, mas nunca pode atender dois ao mesmo tempo.
 
 Antes da ativação: pare a sessão sem logout, faça backup cifrado, valide health,
 confirme o IP de saída e mantenha o proprietário disponível para eventual QR.
