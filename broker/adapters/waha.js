@@ -217,9 +217,23 @@ module.exports = {
   async createSession(ctx, name) {
     const nm = String(name || '').trim();
     if (!nm) throw new passport.CredsError('NAME_REQUIRED', 'nome da sessao obrigatorio');
+    const egressProxy = ctx.egressProxyRegistry
+      ? ctx.egressProxyRegistry.resolve(nm)
+      : null;
+    const proxyConfig = egressProxy
+      ? {
+          server: egressProxy.server,
+          username: egressProxy.username,
+          password: egressProxy.password,
+        }
+      : null;
     const r = await util.httpJson('POST', `${ctx.apiUrl}/api/sessions`, {
       headers: authHeaders(ctx),
-      body: { name: nm, start: false },
+      body: {
+        name: nm,
+        start: false,
+        ...(proxyConfig ? { config: { proxy: proxyConfig } } : {}),
+      },
     });
     if (!r.ok) {
       const detail = JSON.stringify(r.data || {});
@@ -233,6 +247,7 @@ module.exports = {
           { headers: authHeaders(ctx) },
         );
         if (existing.ok && readStatus(existing.data) === 'STOPPED') {
+          await this.configureEgressProxy(ctx, nm, existing.data);
           return { id: nm, name: nm, reused: true };
         }
       }
@@ -243,6 +258,63 @@ module.exports = {
     }
     const created = (r.data && (r.data.name || (r.data.session && r.data.session.name))) || nm;
     return { id: created, name: created };
+  },
+
+  async configureEgressProxy(ctx, id, existingSession) {
+    const name = String(id || '').trim();
+    const egressProxy = ctx.egressProxyRegistry
+      ? ctx.egressProxyRegistry.resolve(name)
+      : null;
+    if (!egressProxy) return { ok: true, mode: 'disabled' };
+
+    let session = existingSession;
+    if (!session) {
+      const current = await util.httpJson(
+        'GET',
+        `${ctx.apiUrl}/api/sessions/${encodeURIComponent(name)}`,
+        { headers: authHeaders(ctx) },
+      );
+      if (!current.ok) {
+        throw new passport.CredsError(
+          'PROXY_CONFIG_FAILED',
+          `WAHA não encontrou a sessão para configurar o proxy (HTTP ${current.status})`,
+        );
+      }
+      session = current.data;
+    }
+    if (readStatus(session) !== 'STOPPED') {
+      throw new passport.CredsError(
+        'PROXY_CONFIG_UNSAFE_STATE',
+        'WAHA exige a sessão parada para trocar o proxy sem reconexão inesperada',
+      );
+    }
+    const currentConfig =
+      session && typeof session.config === 'object' ? session.config : {};
+    const updated = await util.httpJson(
+      'PUT',
+      `${ctx.apiUrl}/api/sessions/${encodeURIComponent(name)}`,
+      {
+        headers: authHeaders(ctx),
+        body: {
+          name,
+          config: {
+            ...currentConfig,
+            proxy: {
+              server: egressProxy.server,
+              username: egressProxy.username,
+              password: egressProxy.password,
+            },
+          },
+        },
+      },
+    );
+    if (!updated.ok) {
+      throw new passport.CredsError(
+        'PROXY_CONFIG_FAILED',
+        `WAHA não aplicou o proxy dedicado (HTTP ${updated.status})`,
+      );
+    }
+    return { ok: true, profileId: egressProxy.id };
   },
 
   // ── importPassport (engine NOWEB) ───────────────────────────────────────────────

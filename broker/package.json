@@ -1,6 +1,6 @@
 {
   "name": "wa-hub-broker",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Broker do hub de APIs não-oficiais do WhatsApp — importa/exporta/migra sessões via passaporte (Contrato A).",
   "main": "index.js",

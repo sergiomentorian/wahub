@@ -29,6 +29,7 @@ const express = require('express');
 const util = require('./lib/util');
 const passport = require('./lib/passport');
 const { buildProviderInventory } = require('./lib/provider-inventory');
+const { createEgressProxyRegistry } = require('./lib/egress-proxy');
 
 // Ordem de tentativa de carga dos adapters. Cada arquivo pode ainda não existir
 // (criado em paralelo por outro agente) ou falhar no init → boot resiliente.
@@ -36,6 +37,7 @@ const ADAPTER_NAMES = ['mentorian', 'evolution', 'evogo', 'wuzapi', 'waha', 'uaz
 
 // REGISTRY keyed por id EXATO do adapter: { [id]: { adapter, ctx } }.
 const registry = {};
+const egressProxyRegistry = createEgressProxyRegistry(process.env);
 
 // Módulos carregados (mesmo se desabilitados no boot) — p/ config em runtime
 // (POST /config/:api habilita ex.: UAZAPI hospedada sem rebuild).
@@ -50,6 +52,11 @@ const MENTORIAN_PROVIDER_MAP = Object.freeze({
   waha: 'waha',
   evolution: 'evolution',
 });
+
+function attachRuntimeContext(ctx) {
+  ctx.egressProxyRegistry = egressProxyRegistry;
+  return ctx;
+}
 
 // ── Config runtime por API (suporta instalações EXTERNAS à stack) ──────────────
 // Campos genéricos -> env vars que cada adapter lê no init(). O overlay parte de
@@ -107,7 +114,7 @@ async function applyApiConfig(name, fields) {
   if (registry[mod.id] && typeof mod.close === 'function') {
     try { await mod.close(registry[mod.id].ctx); } catch (_e) { /* ignore */ }
   }
-  const ctx = await mod.init(overlay);
+  const ctx = attachRuntimeContext(await mod.init(overlay));
   if (fields.webhookUrl) ctx.defaultWebhook = String(fields.webhookUrl);
   registry[mod.id] = { adapter: mod, ctx };
   return { ok: true };
@@ -125,12 +132,14 @@ if (staticUiEnabled) {
 // ── /health (SEM secret) ───────────────────────────────────────────────────────
 // Público: liveness + quais APIs subiram no registry.
 app.get('/health', (req, res) => {
-  res.json({
-    ok: true,
+  const egressProxy = egressProxyRegistry.getStatus();
+  res.status(egressProxy.ready ? 200 : 503).json({
+    ok: egressProxy.ready,
     version: brokerPackage.version,
     apis: Object.keys(registry),
     mode: mutationsEnabled ? 'mutations-enabled' : 'read-only',
     staticUi: staticUiEnabled,
+    egressProxy,
   });
 });
 
@@ -607,7 +616,7 @@ app.post('/config/:api', util.requireMutationsEnabled(mutationsEnabled), async (
     delete registry[mod.id];
     try {
       if (typeof mod.enabled === 'function' && mod.enabled(process.env)) {
-        const ctx = await mod.init(process.env);
+        const ctx = attachRuntimeContext(await mod.init(process.env));
         registry[mod.id] = { adapter: mod, ctx };
       }
     } catch (e) {
@@ -667,6 +676,10 @@ async function boot() {
     throw new Error('HUB_SECRET is required');
   }
 
+  // Em modo required, um arquivo ausente/inválido impede o broker de subir.
+  // Assim nenhuma criação ou migração cai silenciosamente no IP direto da VPS.
+  egressProxyRegistry.start();
+
   for (const name of ADAPTER_NAMES) {
     let adapter;
     try {
@@ -682,7 +695,7 @@ async function boot() {
         util.log('adapter desabilitado (env):', name);
         continue;
       }
-      const ctx = await adapter.init(process.env);
+      const ctx = attachRuntimeContext(await adapter.init(process.env));
       // Anti-colisão: keyed pelo id EXATO exportado pelo adapter, não pelo nome do arquivo.
       registry[adapter.id] = { adapter, ctx };
       util.log('adapter pronto:', adapter.id, '(family=' + adapter.family + ')');

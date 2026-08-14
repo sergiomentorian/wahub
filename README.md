@@ -19,6 +19,9 @@ canônico como formato intermediário para importar/exportar/migrar entre elas.
 - **Instalações externas**: por padrão cada API usa a instalação da stack, mas você pode apontar qualquer uma
   para uma instalação externa (URL + token e, quando a API exige, os DSNs de banco/volume). A configuração é
   aplicada em runtime, persiste no broker e pode ser revertida ao padrão da stack a qualquer momento.
+- **Proxy de saída por número**: WAHA e Evolution recebem a mesma atribuição
+  dedicada do workspace. Em modo obrigatório, uma sessão sem proxy não é criada
+  nem reutilizada e não cai silenciosamente no IP direto da VPS.
 
 ## Estrutura
 
@@ -68,6 +71,9 @@ via SQL direto (`WUZAPI_IMPORT_MODE=auto`).
   reverso (ex.: Traefik/Nginx) com TLS e mantenha o `HUB_SECRET`.
 - **Não faça logout na origem ao migrar**: logout desregistra o aparelho no WhatsApp. A migração usa
   release/disconnect que preserva o registro do device; o destino assume via *replace* multi-device.
+- Credenciais de proxy ficam em arquivo externo montado read-only. O health do
+  broker publica somente modo, contagens e fingerprint sem host, usuário ou
+  senha. Use HTTP/HTTPS com CONNECT no contrato comum de WAHA e Evolution.
 
 > Status: **funcional** — migração de sessão validada ao vivo entre WAHA, WuzAPI, Evolution Go e Evolution API,
 > sem re-parear o celular.

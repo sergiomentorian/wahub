@@ -5,6 +5,99 @@ const test = require('node:test');
 
 const adapter = require('../adapters/evolution');
 
+const assignedProxy = {
+  id: 'proxy-sp-01',
+  host: 'proxy.example.com',
+  port: '8080',
+  protocol: 'http',
+  username: 'cliente',
+  password: 'senha-secreta',
+};
+
+test('createSession sends the dedicated proxy to Evolution', async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({
+      url: String(url),
+      method: options.method,
+      body: options.body ? JSON.parse(options.body) : null,
+    });
+    if (String(url).includes('/instance/fetchInstances')) {
+      return new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(
+      JSON.stringify({ instance: { instanceName: 'workspace-123' } }),
+      { status: 201, headers: { 'content-type': 'application/json' } },
+    );
+  };
+
+  await adapter.createSession(
+    {
+      apiUrl: 'https://evolution.example.com',
+      apiKey: 'secret',
+      egressProxyRegistry: { resolve: () => assignedProxy },
+    },
+    'workspace-123',
+  );
+
+  assert.deepEqual(calls[1].body, {
+    instanceName: 'workspace-123',
+    integration: 'WHATSAPP-BAILEYS',
+    proxyHost: 'proxy.example.com',
+    proxyPort: '8080',
+    proxyProtocol: 'http',
+    proxyUsername: 'cliente',
+    proxyPassword: 'senha-secreta',
+  });
+});
+
+test('createSession configures the proxy before reusing Evolution', async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({
+      url: String(url),
+      method: options.method,
+      body: options.body ? JSON.parse(options.body) : null,
+    });
+    if (String(url).includes('/instance/fetchInstances')) {
+      return new Response(
+        JSON.stringify([{ name: 'workspace-123', connectionStatus: 'close' }]),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    return new Response(JSON.stringify({ proxy: { enabled: true } }), {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  await adapter.createSession(
+    {
+      apiUrl: 'https://evolution.example.com',
+      apiKey: 'secret',
+      egressProxyRegistry: { resolve: () => assignedProxy },
+    },
+    'workspace-123',
+  );
+
+  assert.match(calls[1].url, /\/proxy\/set\/workspace-123$/);
+  assert.deepEqual(calls[1].body, {
+    enabled: true,
+    host: 'proxy.example.com',
+    port: '8080',
+    protocol: 'http',
+    username: 'cliente',
+    password: 'senha-secreta',
+  });
+});
+
 test('createSession reuses an existing disconnected Evolution instance', async (t) => {
   const originalFetch = global.fetch;
   t.after(() => { global.fetch = originalFetch; });

@@ -2,6 +2,8 @@
 .env
 runtime-config.json
 broker/runtime-config.json
+config/*.secret.json
+config/egress-proxies.json
 
 # ── documentação interna de planejamento (não publicar) ───────────────────────
 PLANO_HUB_APIS.md

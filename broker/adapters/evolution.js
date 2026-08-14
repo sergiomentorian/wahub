@@ -204,6 +204,9 @@ module.exports = {
   async createSession(ctx, name) {
     const nm = String(name || '').trim();
     if (!nm) throw new passport.CredsError('NAME_REQUIRED', 'nome da instancia obrigatorio');
+    const egressProxy = ctx.egressProxyRegistry
+      ? ctx.egressProxyRegistry.resolve(nm)
+      : null;
     const existing = (await this.list(ctx)).find((item) => item.id === nm || item.name === nm);
     if (existing) {
       if (existing.connected) {
@@ -212,11 +215,24 @@ module.exports = {
           `Evolution "${nm}" já está conectada; migração recusada`,
         );
       }
+      await this.configureEgressProxy(ctx, nm);
       return { id: nm, name: nm, reused: true };
     }
     const r = await util.httpJson('POST', `${ctx.apiUrl}/instance/create`, {
       apikey: ctx.apiKey,
-      body: { instanceName: nm, integration: 'WHATSAPP-BAILEYS' },
+      body: {
+        instanceName: nm,
+        integration: 'WHATSAPP-BAILEYS',
+        ...(egressProxy
+          ? {
+              proxyHost: egressProxy.host,
+              proxyPort: egressProxy.port,
+              proxyProtocol: egressProxy.protocol,
+              proxyUsername: egressProxy.username,
+              proxyPassword: egressProxy.password,
+            }
+          : {}),
+      },
     });
     const inst = (r.data && r.data.instance) || {};
     const iname = inst.instanceName || nm;
@@ -228,6 +244,36 @@ module.exports = {
     }
     // id = NOME (Evolution identifica pela instanceName).
     return { id: iname, name: iname };
+  },
+
+  async configureEgressProxy(ctx, id) {
+    const name = String(id || '').trim();
+    const egressProxy = ctx.egressProxyRegistry
+      ? ctx.egressProxyRegistry.resolve(name)
+      : null;
+    if (!egressProxy) return { ok: true, mode: 'disabled' };
+    const proxyResult = await util.httpJson(
+      'POST',
+      `${ctx.apiUrl}/proxy/set/${encodeURIComponent(name)}`,
+      {
+        apikey: ctx.apiKey,
+        body: {
+          enabled: true,
+          host: egressProxy.host,
+          port: egressProxy.port,
+          protocol: egressProxy.protocol,
+          username: egressProxy.username,
+          password: egressProxy.password,
+        },
+      },
+    );
+    if (!proxyResult.ok) {
+      throw new passport.CredsError(
+        'PROXY_CONFIG_FAILED',
+        `Evolution não aplicou o proxy dedicado (HTTP ${proxyResult.status})`,
+      );
+    }
+    return { ok: true, profileId: egressProxy.id };
   },
 
   // ── importPassport ────────────────────────────────────────────────────────────

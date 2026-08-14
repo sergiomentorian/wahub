@@ -8,6 +8,105 @@ const test = require('node:test');
 
 const adapter = require('../adapters/waha');
 
+const assignedProxy = {
+  id: 'proxy-sp-01',
+  server: 'proxy.example.com:8080',
+  username: 'cliente',
+  password: 'senha-secreta',
+};
+
+test('createSession sends the dedicated per-session proxy to WAHA', async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+
+  let requestBody;
+  global.fetch = async (_url, options = {}) => {
+    requestBody = JSON.parse(options.body);
+    return new Response(
+      JSON.stringify({ name: 'workspace-123', status: 'STOPPED' }),
+      { status: 201, headers: { 'content-type': 'application/json' } },
+    );
+  };
+
+  await adapter.createSession(
+    {
+      apiUrl: 'https://waha.example.com',
+      apiKey: 'secret',
+      egressProxyRegistry: { resolve: () => assignedProxy },
+    },
+    'workspace-123',
+  );
+
+  assert.deepEqual(requestBody, {
+    name: 'workspace-123',
+    start: false,
+    config: {
+      proxy: {
+        server: 'proxy.example.com:8080',
+        username: 'cliente',
+        password: 'senha-secreta',
+      },
+    },
+  });
+});
+
+test('createSession updates the proxy before reusing a stopped WAHA session', async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({
+      method: options.method,
+      url: String(url),
+      body: options.body ? JSON.parse(options.body) : null,
+    });
+    if (options.method === 'POST') {
+      return new Response(
+        JSON.stringify({ message: "Session 'workspace-123' already exists." }),
+        { status: 422, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (options.method === 'GET') {
+      return new Response(
+        JSON.stringify({
+          name: 'workspace-123',
+          status: 'STOPPED',
+          config: { ignore: { groups: true } },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    return new Response(JSON.stringify({ name: 'workspace-123' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  await adapter.createSession(
+    {
+      apiUrl: 'https://waha.example.com',
+      apiKey: 'secret',
+      egressProxyRegistry: { resolve: () => assignedProxy },
+    },
+    'workspace-123',
+  );
+
+  assert.deepEqual(calls.map((call) => call.method), ['POST', 'GET', 'PUT']);
+  assert.deepEqual(calls[2].body.config, {
+    ignore: { groups: true },
+    proxy: {
+      server: 'proxy.example.com:8080',
+      username: 'cliente',
+      password: 'senha-secreta',
+    },
+  });
+});
+
 test('createSession reuses an existing stopped WAHA session', async (t) => {
   const originalFetch = global.fetch;
   t.after(() => {

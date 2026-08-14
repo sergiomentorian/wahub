@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "profiles": {
+    "proxy-sp-01": {
+      "url": "http://usuario:senha@proxy.example.com:8080",
+      "vendor": "fornecedor-homologado",
+      "country": "BR",
+      "region": "SP",
+      "dedicated": true,
+      "rotation": "disabled"
+    }
+  },
+  "assignments": {
+    "00000000-0000-0000-0000-000000000000": "proxy-sp-01"
+  }
+}

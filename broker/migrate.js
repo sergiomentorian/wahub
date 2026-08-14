@@ -292,6 +292,11 @@ async function run(registry, body) {
       }
       destinationCreated = true;
       push('create', 'destino criado: ' + toId);
+    } else if (typeof toAdapter.configureEgressProxy === 'function') {
+      // O destino pode ter sido informado por id e, portanto, não passar por
+      // createSession. Configure o proxy antes de liberar a origem.
+      await toAdapter.configureEgressProxy(toCtx, toId);
+      push('proxy-destino', 'proxy de saída dedicado validado');
     }
 
     // ── PASSO 4: LIBERAR a origem (parar + LIMPAR a sessão local, SEM deslogar) ──
