@@ -69,6 +69,7 @@ test('returns the three Mentorian-approved providers with isolated health', asyn
   assert.equal(inventory.providers[1].package.automaticUpdates, false);
   assert.equal(inventory.providers[1].package.history[0].version, '2026.7.1');
   assert.equal(inventory.providers[2].package.status, 'up_to_date');
+  assert.equal(inventory.providers[2].package.automaticUpdates, false);
 });
 
 test('uses the protected stable auto-update state persisted by the VPS updater', async () => {

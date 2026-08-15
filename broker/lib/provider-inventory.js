@@ -67,8 +67,8 @@ async function buildEvolutionProvider(entry, env, fetchImpl, generatedAt, releas
       status,
       releaseChannel: String(releaseState?.releaseChannel || env.EVOLUTION_RELEASE_CHANNEL || 'stable'),
       prerelease: false,
-      automaticUpdates:
-        releaseState?.automaticUpdates === true || env.EVOLUTION_AUTOMATIC_UPDATES === 'true',
+      // Only persisted updater state proves that the VPS timer executed.
+      automaticUpdates: releaseState?.automaticUpdates === true,
       lastCheckedAt: official.checkedAt,
       lastUpdatedAt: String(releaseState?.lastUpdatedAt || env.EVOLUTION_UPDATED_AT || generatedAt),
       lastUpdateSource: String(releaseState?.lastUpdateSource || 'release'),
@@ -140,7 +140,9 @@ async function buildWahaProvider(entry, env, fetchImpl, generatedAt, releaseStat
       status,
       releaseChannel: String(releaseState?.releaseChannel || env.WAHA_RELEASE_CHANNEL || 'stable'),
       prerelease: false,
-      automaticUpdates: releaseState?.automaticUpdates === true || env.WAHA_AUTOMATIC_UPDATES === 'true',
+      // Environment intent is not operational proof; the updater writes this
+      // state after a successful protected verification.
+      automaticUpdates: releaseState?.automaticUpdates === true,
       lastCheckedAt: official.checkedAt,
       lastUpdatedAt: String(releaseState?.lastUpdatedAt || env.WAHA_UPDATED_AT || generatedAt),
       lastUpdateSource: String(releaseState?.lastUpdateSource || 'release'),

@@ -6,7 +6,9 @@ on:
     - cron: "17 5 * * *"
   push:
     branches:
+      - main
       - codex/mentorian-install
+      - codex/provider-health-dashboard-hub
     paths:
       - waha-noweb/**
       - .github/workflows/publish-waha-stable.yml

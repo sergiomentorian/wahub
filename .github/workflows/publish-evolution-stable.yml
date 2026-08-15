@@ -6,7 +6,9 @@ on:
     - cron: "37 5 * * *"
   push:
     branches:
+      - main
       - codex/mentorian-install
+      - codex/provider-health-dashboard-hub
     paths:
       - evolution-stable/**
       - .github/workflows/publish-evolution-stable.yml
