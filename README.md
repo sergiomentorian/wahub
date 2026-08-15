@@ -19,7 +19,7 @@ canônico como formato intermediário para importar/exportar/migrar entre elas.
 - **Instalações externas**: por padrão cada API usa a instalação da stack, mas você pode apontar qualquer uma
   para uma instalação externa (URL + token e, quando a API exige, os DSNs de banco/volume). A configuração é
   aplicada em runtime, persiste no broker e pode ser revertida ao padrão da stack a qualquer momento.
-- **Proxy de saída por número**: WAHA e Evolution recebem a mesma atribuição
+- **Proxy de saída por workspace**: WAHA e Evolution recebem a mesma atribuição
   dedicada do workspace. Em modo obrigatório, uma sessão sem proxy não é criada
   nem reutilizada e não cai silenciosamente no IP direto da VPS.
 

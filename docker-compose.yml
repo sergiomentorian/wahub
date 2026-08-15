@@ -150,7 +150,7 @@ services:
     restart: unless-stopped
 
   broker:
-    image: ghcr.io/sergiomentorian/wahub-broker:22eb1637fe81fdbf76c4ab54aef44fe81de586f5
+    image: ${BROKER_IMAGE:-ghcr.io/sergiomentorian/wahub-broker:fd407477c99745b08aee522efd17377a6b98a64b}
     env_file:
       - ${MENTORIAN_GATEWAY_ENV_FILE:-../mentorian-app/services/whatsapp-baileys-gateway/.env}
     environment:
