@@ -18,11 +18,11 @@ test('WAHA updater accepts only an official stable release', () => {
   assert.doesNotMatch(workflow, /devlikeapro\/waha:latest(?:\s|$)/);
 });
 
-test('WAHA updater protects credentials and rolls back an unhealthy release', () => {
+test('WAHA updater protects credentials and restores the exact prior session state', () => {
   assert.match(updater, /WAHA_BACKUP_ENCRYPTION_KEY/);
   assert.match(updater, /openssl enc -aes-256-cbc -pbkdf2 -salt/);
-  assert.match(updater, /expected_registered/);
-  assert.match(updater, /expected_connected/);
+  assert.match(updater, /before_state/);
+  assert.match(updater, /json\.loads\(sys\.argv\[1\]\)==json\.loads\(sys\.argv\[2\]\)/);
   assert.match(updater, /rollback automático/);
   assert.match(updater, /waha-rollback\.override\.yml/);
   assert.doesNotMatch(updater, /\/logout|SCAN_QR_CODE|auth\/qr/);

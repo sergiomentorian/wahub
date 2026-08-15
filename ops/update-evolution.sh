@@ -67,10 +67,6 @@ evolution_state() {
 }
 
 before_state="$(evolution_state)"
-python3 -c 'import json,sys;a=json.loads(sys.argv[1]);sys.exit(0 if all(x["connected"] for x in a) else 1)' "$before_state" || {
-  echo "Existem instâncias Evolution não operacionais; atualização bloqueada antes de qualquer parada." >&2
-  exit 2
-}
 
 candidate_image="ghcr.io/sergiomentorian/evolution-api:${stable_version}-mentorian"
 current_image="$(docker inspect -f '{{.Config.Image}}' "$evolution_id")"

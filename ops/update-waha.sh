@@ -56,20 +56,14 @@ docker run --rm --entrypoint node "$candidate_image" -e '
   const p=require("/app/node_modules/@adiwajshing/baileys/package.json");
   if(p.version!=="7.0.0-rc14") process.exit(2);'
 
-session_counts() {
+session_state() {
   docker exec "$broker_id" node -e '
     fetch(`${process.env.WAHA_API_URL}/api/sessions?all=true`,{headers:{"X-Api-Key":process.env.WAHA_API_KEY}})
-      .then(async r=>{if(!r.ok)throw Error(String(r.status));const b=await r.json();const a=Array.isArray(b)?b:(b.sessions||[]);console.log(JSON.stringify({registered:a.length,connected:a.filter(s=>String(s.status||s.state).toUpperCase()==="WORKING").length}))})
+      .then(async r=>{if(!r.ok)throw Error(String(r.status));const b=await r.json();const a=Array.isArray(b)?b:(b.sessions||[]);const rows=a.map(s=>({name:String(s.name||s.id||""),status:String(s.status||s.state||"").toUpperCase()})).filter(s=>s.name).sort((a,b)=>a.name.localeCompare(b.name));console.log(JSON.stringify(rows))})
       .catch(()=>process.exit(2));'
 }
 
-before_counts="$(session_counts)"
-expected_registered="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["registered"])' "$before_counts")"
-expected_connected="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["connected"])' "$before_counts")"
-[[ "$expected_registered" -eq "$expected_connected" ]] || {
-  echo "Existem sessões WAHA não operacionais; atualização bloqueada antes de qualquer parada." >&2
-  exit 2
-}
+before_state="$(session_state)"
 current_image="$(docker inspect -f '{{.Config.Image}}' "$waha_id")"
 session_volume="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/app/.sessions"}}{{.Name}}{{end}}{{end}}' "$waha_id")"
 [[ -n "$current_image" && -n "$session_volume" ]] || { echo "Imagem ou volume WAHA não identificado." >&2; exit 2; }
@@ -90,8 +84,8 @@ chmod 0600 "$backup_file"
 promote_failed=true
 "${compose[@]}" -f "$override_file" up -d --no-deps --no-build waha
 for _ in $(seq 1 30); do
-  if after_counts="$(session_counts 2>/dev/null)"; then
-    if python3 -c 'import json,sys;a=json.loads(sys.argv[1]);sys.exit(0 if a["registered"]==int(sys.argv[2]) and a["connected"]==int(sys.argv[3]) else 1)' "$after_counts" "$expected_registered" "$expected_connected"; then
+  if after_state="$(session_state 2>/dev/null)"; then
+    if python3 -c 'import json,sys;sys.exit(0 if json.loads(sys.argv[1])==json.loads(sys.argv[2]) else 1)' "$after_state" "$before_state"; then
       promote_failed=false
       break
     fi
@@ -111,8 +105,8 @@ echo "WAHA não restaurou todas as sessões; aplicando rollback automático." >&
 "${compose[@]}" stop -t 30 waha || true
 "${compose[@]}" -f "$rollback_file" up -d --no-deps --no-build waha
 for _ in $(seq 1 30); do
-  if rollback_counts="$(session_counts 2>/dev/null)"; then
-    if python3 -c 'import json,sys;a=json.loads(sys.argv[1]);sys.exit(0 if a["registered"]==int(sys.argv[2]) and a["connected"]==int(sys.argv[3]) else 1)' "$rollback_counts" "$expected_registered" "$expected_connected"; then
+  if rollback_state="$(session_state 2>/dev/null)"; then
+    if python3 -c 'import json,sys;sys.exit(0 if json.loads(sys.argv[1])==json.loads(sys.argv[2]) else 1)' "$rollback_state" "$before_state"; then
       write_release_state "$current_version" rollback "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       echo "Rollback WAHA restaurado em $current_version." >&2
       exit 1
