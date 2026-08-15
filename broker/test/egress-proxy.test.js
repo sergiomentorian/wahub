@@ -85,6 +85,7 @@ test('resolves one HTTP proxy per workspace and keeps public status secret-free'
   assert.doesNotMatch(publicStatus, /proxy\.example\.com/);
   assert.equal(registry.getStatus().profileCount, 1);
   assert.equal(registry.getStatus().assignmentCount, 1);
+  assert.equal(registry.listPublic()[0].label, 'Proxy 1');
 });
 
 test('fails closed when a workspace has no dedicated assignment', (t) => {
@@ -132,8 +133,35 @@ test('unassign keeps the purchased proxy available for reassignment', (t) => {
 
   assert.equal(registry.getWorkspaceStatus(workspaceId).assigned, false);
   assert.equal(registry.listPublic().length, 1);
+  assert.equal(registry.listPublic()[0].label, 'Proxy 1');
   assert.equal(registry.listPublic()[0].assigned, false);
   assert.doesNotMatch(JSON.stringify(registry.listPublic()), /senha-super-secreta/);
+});
+
+test('keeps unique asset labels stable across legacy inventory entries', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-egress-labels-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configFile = writeConfig(directory, {});
+  const raw = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  raw.profiles['proxy-rj-02'] = {
+    url: 'http://outro:segredo@proxy-2.example.com:8080',
+    vendor: 'ProxyAds',
+    country: 'BR',
+    region: 'RJ',
+    dedicated: true,
+    rotation: 'disabled',
+    label: 'Proxy 7',
+  };
+  fs.writeFileSync(configFile, JSON.stringify(raw));
+  fs.chmodSync(configFile, 0o600);
+  const registry = new EgressProxyRegistry({ mode: 'assigned', configFile });
+
+  registry.start();
+
+  assert.deepEqual(
+    registry.listPublic().map((proxy) => proxy.label).sort(),
+    ['Proxy 1', 'Proxy 7'],
+  );
 });
 
 test('blocks a reconnect when the assigned proxy is marked offline', (t) => {

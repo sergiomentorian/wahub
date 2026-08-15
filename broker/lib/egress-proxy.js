@@ -99,6 +99,7 @@ class EgressProxyRegistry {
     );
     return [...this.parsed.profiles.values()].map((profile) => ({
       profileId: profile.id,
+      label: profile.label,
       assigned: workspaceByProfile.has(profile.id),
       assignedWorkspaceId: workspaceByProfile.get(profile.id) || null,
       state:
@@ -135,6 +136,7 @@ class EgressProxyRegistry {
       assigned: true,
       state: expired ? 'expired' : profile.validationStatus,
       profileId: profile.id,
+      label: profile.label,
       vendor: profile.vendor,
       country: profile.country,
       region: profile.region,
@@ -160,6 +162,7 @@ class EgressProxyRegistry {
     const profileId = profileIdForCredentials(profile);
     const raw = this.toRawConfig();
     raw.profiles[profileId] = {
+      label: raw.profiles[profileId]?.label || nextProxyLabel(raw.profiles),
       url: buildProxyUrl(profile),
       vendor: profile.vendor,
       country: profile.country,
@@ -238,6 +241,7 @@ class EgressProxyRegistry {
     const probe = await probeHttpsThroughProxy(profile);
     const now = new Date().toISOString();
     const stored = {
+      label: null,
       url: buildProxyUrl(profile),
       vendor: profile.vendor,
       country: profile.country,
@@ -252,6 +256,7 @@ class EgressProxyRegistry {
     };
     const raw = this.toRawConfig();
     const profileId = profileIdForCredentials(profile);
+    stored.label = raw.profiles[profileId]?.label || nextProxyLabel(raw.profiles);
     const assignedWorkspaceId = Object.entries(raw.assignments).find(
       ([candidateWorkspaceId, candidateProfileId]) =>
         candidateProfileId === profileId && candidateWorkspaceId !== workspaceId,
@@ -407,6 +412,7 @@ class EgressProxyRegistry {
     const assignments = {};
     for (const profile of this.parsed.profiles.values()) {
       profiles[profile.id] = {
+        label: profile.label,
         url: buildProxyUrl(profile),
         vendor: profile.vendor,
         country: profile.country,
@@ -493,6 +499,10 @@ function parseProxyConfig(raw) {
     if (!vendor || !/^[A-Z]{2}$/.test(country)) throw invalidConfig();
     profiles.set(id, {
       id,
+      label:
+        typeof value.label === 'string' && value.label.trim()
+          ? value.label.trim().slice(0, 80)
+          : null,
       vendor,
       country,
       region,
@@ -521,6 +531,17 @@ function parseProxyConfig(raw) {
     });
   }
 
+  const usedLabels = new Set();
+  for (const profile of [...profiles.values()].sort((left, right) => left.id.localeCompare(right.id))) {
+    if (profile.label) {
+      if (usedLabels.has(profile.label)) throw invalidConfig();
+      usedLabels.add(profile.label);
+      continue;
+    }
+    profile.label = nextProxyLabelFromSet(usedLabels);
+    usedLabels.add(profile.label);
+  }
+
   const assignments = new Map();
   const usedProfiles = new Set();
   for (const [workspaceId, profileId] of Object.entries(input.assignments)) {
@@ -537,8 +558,9 @@ function parseProxyConfig(raw) {
   }
 
   const publicShape = {
-    profiles: [...profiles.values()].map(({ id, vendor, country, region, credentialFingerprint }) => ({
+    profiles: [...profiles.values()].map(({ id, label, vendor, country, region, credentialFingerprint }) => ({
       id,
+      label,
       vendor,
       country,
       region,
@@ -674,6 +696,22 @@ function credentialFingerprint(profile) {
 
 function profileIdForCredentials(profile) {
   return `proxy-${credentialFingerprint(profile)}`;
+}
+
+function nextProxyLabel(profiles) {
+  return nextProxyLabelFromSet(
+    new Set(
+      Object.values(profiles)
+        .map((profile) => (isRecord(profile) ? String(profile.label || '').trim() : ''))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function nextProxyLabelFromSet(usedLabels) {
+  let number = 1;
+  while (usedLabels.has(`Proxy ${number}`)) number += 1;
+  return `Proxy ${number}`;
 }
 
 function optionalIso(value) {
