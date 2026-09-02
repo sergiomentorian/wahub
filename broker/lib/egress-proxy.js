@@ -13,6 +13,7 @@ const WORKSPACE_PATTERN = /^[a-zA-Z0-9_-]{8,100}$/;
 const PROFILE_PATTERN = /^[a-zA-Z0-9_-]{3,64}$/;
 const SUPPORTED_PROTOCOLS = new Set(['http:', 'https:']);
 const SUPPORTED_MODES = new Set(['disabled', 'assigned', 'required']);
+const DEFAULT_VALIDATION_FAILURE_THRESHOLD = 3;
 
 class EgressProxyError extends Error {
   constructor(code, message, status = 503) {
@@ -24,7 +25,12 @@ class EgressProxyError extends Error {
 }
 
 class EgressProxyRegistry {
-  constructor({ mode, configFile }) {
+  constructor({
+    mode,
+    configFile,
+    probeProxy = probeHttpsThroughProxy,
+    validationFailureThreshold = DEFAULT_VALIDATION_FAILURE_THRESHOLD,
+  }) {
     if (!SUPPORTED_MODES.has(mode)) {
       throw new EgressProxyError(
         'EGRESS_PROXY_MODE_INVALID',
@@ -33,6 +39,12 @@ class EgressProxyRegistry {
     }
     this.mode = mode;
     this.configFile = configFile || null;
+    this.probeProxy = probeProxy;
+    this.validationFailureThreshold = Math.max(
+      1,
+      Number.parseInt(String(validationFailureThreshold), 10) ||
+        DEFAULT_VALIDATION_FAILURE_THRESHOLD,
+    );
     this.parsed = null;
     this.lastModifiedMs = null;
     this.lastLoadedAt = null;
@@ -112,6 +124,8 @@ class EgressProxyRegistry {
       expiresAt: profile.expiresAt,
       lastValidatedAt: profile.lastValidatedAt,
       validationStatus: profile.validationStatus,
+      consecutiveValidationFailures: profile.consecutiveValidationFailures,
+      lastValidationErrorAt: profile.lastValidationErrorAt,
       credentialFingerprint: profile.credentialFingerprint,
     }));
   }
@@ -143,6 +157,8 @@ class EgressProxyRegistry {
       expiresAt: profile.expiresAt,
       lastValidatedAt: profile.lastValidatedAt,
       validationStatus: profile.validationStatus,
+      consecutiveValidationFailures: profile.consecutiveValidationFailures,
+      lastValidationErrorAt: profile.lastValidationErrorAt,
       credentialFingerprint: profile.credentialFingerprint,
     };
   }
@@ -157,7 +173,7 @@ class EgressProxyRegistry {
     }
     this.reload(false);
     const profile = await normalizeManagedProfile('proxy-inventory', input);
-    const probe = await probeHttpsThroughProxy(profile);
+    const probe = await this.probeProxy(profile);
     const now = new Date().toISOString();
     const profileId = profileIdForCredentials(profile);
     const raw = this.toRawConfig();
@@ -172,6 +188,8 @@ class EgressProxyRegistry {
       expiresAt: profile.expiresAt,
       lastValidatedAt: now,
       validationStatus: 'online',
+      consecutiveValidationFailures: 0,
+      lastValidationErrorAt: null,
       credentialFingerprint: credentialFingerprint(profile),
       exitIpHash: crypto.createHash('sha256').update(probe.exitIp).digest('hex').slice(0, 12),
     };
@@ -183,12 +201,39 @@ class EgressProxyRegistry {
   async validateAll() {
     if (this.mode === 'disabled') return [];
     this.reload(false);
-    const profileIds = [...this.parsed.profiles.keys()];
-    const results = [];
-    for (const profileId of profileIds) {
-      results.push(await this.validateProfile(profileId));
+    const profiles = [...this.parsed.profiles.values()];
+    const outcomes = await Promise.all(
+      profiles.map((profile) => this.probeValidation(profile)),
+    );
+
+    // A validação periódica publica um snapshot único. Assim o painel e os
+    // consumidores nunca observam metade do inventário antigo e metade nova.
+    this.reload(true);
+    const raw = this.toRawConfig();
+    const validatedIds = [];
+    const now = new Date().toISOString();
+    for (const outcome of outcomes) {
+      const current = this.parsed.profiles.get(outcome.profileId);
+      if (
+        !current ||
+        current.credentialFingerprint !== outcome.credentialFingerprint
+      ) {
+        continue;
+      }
+      raw.profiles[outcome.profileId] = {
+        ...raw.profiles[outcome.profileId],
+        ...this.validationPatch(current, outcome, now),
+      };
+      validatedIds.push(outcome.profileId);
     }
-    return results;
+    if (validatedIds.length > 0) {
+      this.writeConfig(raw);
+      this.reload(true);
+    }
+    const publicById = new Map(
+      this.listPublic().map((profile) => [profile.profileId, profile]),
+    );
+    return validatedIds.map((profileId) => publicById.get(profileId));
   }
 
   async validateProfile(profileId) {
@@ -198,24 +243,77 @@ class EgressProxyRegistry {
     if (!profile) {
       throw new EgressProxyError('EGRESS_PROXY_NOT_FOUND', 'Proxy não encontrada', 404);
     }
-    let exitIpHash = profile.exitIpHash;
-    let validationStatus = 'online';
-    try {
-      const probe = await probeHttpsThroughProxy(profile);
-      exitIpHash = crypto.createHash('sha256').update(probe.exitIp).digest('hex').slice(0, 12);
-    } catch (_error) {
-      validationStatus = 'offline';
+    const outcome = await this.probeValidation(profile);
+    this.reload(true);
+    const current = this.parsed.profiles.get(profileId);
+    if (
+      !current ||
+      current.credentialFingerprint !== outcome.credentialFingerprint
+    ) {
+      throw new EgressProxyError(
+        'EGRESS_PROXY_CONFIG_CHANGED',
+        'A proxy mudou durante a validação; tente novamente',
+        409,
+      );
     }
     const raw = this.toRawConfig();
     raw.profiles[profileId] = {
       ...raw.profiles[profileId],
-      lastValidatedAt: new Date().toISOString(),
-      validationStatus,
-      exitIpHash,
+      ...this.validationPatch(current, outcome, new Date().toISOString()),
     };
     this.writeConfig(raw);
     this.reload(true);
     return this.listPublic().find((candidate) => candidate.profileId === profileId);
+  }
+
+  async probeValidation(profile) {
+    try {
+      const probe = await this.probeProxy(profile);
+      return {
+        profileId: profile.id,
+        credentialFingerprint: profile.credentialFingerprint,
+        ok: true,
+        exitIpHash: crypto
+          .createHash('sha256')
+          .update(probe.exitIp)
+          .digest('hex')
+          .slice(0, 12),
+      };
+    } catch (_error) {
+      return {
+        profileId: profile.id,
+        credentialFingerprint: profile.credentialFingerprint,
+        ok: false,
+        exitIpHash: profile.exitIpHash,
+      };
+    }
+  }
+
+  validationPatch(profile, outcome, now) {
+    if (outcome.ok) {
+      return {
+        lastValidatedAt: now,
+        validationStatus: 'online',
+        consecutiveValidationFailures: 0,
+        lastValidationErrorAt: null,
+        exitIpHash: outcome.exitIpHash,
+      };
+    }
+    const consecutiveValidationFailures = Math.min(
+      profile.consecutiveValidationFailures + 1,
+      this.validationFailureThreshold,
+    );
+    return {
+      lastValidatedAt: now,
+      validationStatus:
+        profile.validationStatus === 'offline' ||
+        consecutiveValidationFailures >= this.validationFailureThreshold
+          ? 'offline'
+          : profile.validationStatus,
+      consecutiveValidationFailures,
+      lastValidationErrorAt: now,
+      exitIpHash: profile.exitIpHash,
+    };
   }
 
   async assign(workspaceId, input) {
@@ -238,7 +336,7 @@ class EgressProxyRegistry {
       );
     }
     const profile = await normalizeManagedProfile(workspaceId, input);
-    const probe = await probeHttpsThroughProxy(profile);
+    const probe = await this.probeProxy(profile);
     const now = new Date().toISOString();
     const stored = {
       label: null,
@@ -251,6 +349,8 @@ class EgressProxyRegistry {
       expiresAt: profile.expiresAt,
       lastValidatedAt: now,
       validationStatus: 'online',
+      consecutiveValidationFailures: 0,
+      lastValidationErrorAt: null,
       credentialFingerprint: credentialFingerprint(profile),
       exitIpHash: crypto.createHash('sha256').update(probe.exitIp).digest('hex').slice(0, 12),
     };
@@ -288,7 +388,7 @@ class EgressProxyRegistry {
       throw new EgressProxyError('EGRESS_PROXY_NOT_FOUND', 'Proxy não encontrada', 404);
     }
     const profile = this.parsed.profiles.get(profileId);
-    const probe = await probeHttpsThroughProxy(profile);
+    const probe = await this.probeProxy(profile);
     const assignedWorkspaceId = Object.entries(raw.assignments).find(
       ([candidateWorkspaceId, candidateProfileId]) =>
         candidateProfileId === profileId && candidateWorkspaceId !== workspaceId,
@@ -305,6 +405,8 @@ class EgressProxyRegistry {
       ...raw.profiles[profileId],
       lastValidatedAt: new Date().toISOString(),
       validationStatus: 'online',
+      consecutiveValidationFailures: 0,
+      lastValidationErrorAt: null,
       exitIpHash: crypto
         .createHash('sha256')
         .update(probe.exitIp)
@@ -422,6 +524,8 @@ class EgressProxyRegistry {
         expiresAt: profile.expiresAt,
         lastValidatedAt: profile.lastValidatedAt,
         validationStatus: profile.validationStatus,
+        consecutiveValidationFailures: profile.consecutiveValidationFailures,
+        lastValidationErrorAt: profile.lastValidationErrorAt,
         credentialFingerprint: profile.credentialFingerprint,
         exitIpHash: profile.exitIpHash,
       };
@@ -517,6 +621,12 @@ function parseProxyConfig(raw) {
       validationStatus: ['online', 'offline'].includes(value.validationStatus)
         ? value.validationStatus
         : 'pending',
+      consecutiveValidationFailures:
+        Number.isInteger(value.consecutiveValidationFailures) &&
+        value.consecutiveValidationFailures >= 0
+          ? Math.min(value.consecutiveValidationFailures, 1000)
+          : 0,
+      lastValidationErrorAt: optionalIso(value.lastValidationErrorAt),
       credentialFingerprint:
         typeof value.credentialFingerprint === 'string'
           ? value.credentialFingerprint.slice(0, 16)

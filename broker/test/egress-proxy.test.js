@@ -183,6 +183,90 @@ test('blocks a reconnect when the assigned proxy is marked offline', (t) => {
   );
 });
 
+test('requires three consecutive probe failures before blocking reconnects', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-egress-hysteresis-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configFile = writeConfig(directory);
+  const raw = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  raw.profiles['proxy-sp-01'].validationStatus = 'online';
+  fs.writeFileSync(configFile, JSON.stringify(raw));
+  fs.chmodSync(configFile, 0o600);
+  let probeAvailable = false;
+  const registry = new EgressProxyRegistry({
+    mode: 'assigned',
+    configFile,
+    probeProxy: async () => {
+      if (!probeAvailable) throw new Error('transient probe failure');
+      return { exitIp: '203.0.113.10' };
+    },
+  });
+  registry.start();
+
+  await registry.validateProfile('proxy-sp-01');
+  await registry.validateProfile('proxy-sp-01');
+  assert.equal(registry.getWorkspaceStatus(workspaceId).state, 'online');
+  assert.equal(
+    registry.getWorkspaceStatus(workspaceId).consecutiveValidationFailures,
+    2,
+  );
+  assert.equal(registry.resolve(workspaceId).id, 'proxy-sp-01');
+
+  await registry.validateProfile('proxy-sp-01');
+  assert.equal(registry.getWorkspaceStatus(workspaceId).state, 'offline');
+  assert.throws(
+    () => registry.resolve(workspaceId),
+    (error) =>
+      error instanceof EgressProxyError &&
+      error.code === 'EGRESS_PROXY_UNAVAILABLE',
+  );
+
+  probeAvailable = true;
+  await registry.validateProfile('proxy-sp-01');
+  assert.equal(registry.getWorkspaceStatus(workspaceId).state, 'online');
+  assert.equal(
+    registry.getWorkspaceStatus(workspaceId).consecutiveValidationFailures,
+    0,
+  );
+  assert.equal(registry.getWorkspaceStatus(workspaceId).lastValidationErrorAt, null);
+});
+
+test('publishes one atomic inventory snapshot after validating all proxies', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-egress-atomic-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configFile = writeConfig(directory, {});
+  const raw = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  raw.profiles['proxy-rj-02'] = {
+    ...raw.profiles['proxy-sp-01'],
+    label: 'Proxy 2',
+    url: 'http://cliente:outro-segredo@proxy-2.example.com:8080',
+  };
+  fs.writeFileSync(configFile, JSON.stringify(raw));
+  fs.chmodSync(configFile, 0o600);
+  const registry = new EgressProxyRegistry({
+    mode: 'assigned',
+    configFile,
+    probeProxy: async (profile) => ({
+      exitIp: profile.id === 'proxy-sp-01' ? '203.0.113.10' : '203.0.113.11',
+    }),
+  });
+  registry.start();
+  const persistConfig = registry.writeConfig.bind(registry);
+  let writes = 0;
+  registry.writeConfig = (next) => {
+    writes += 1;
+    persistConfig(next);
+  };
+
+  const result = await registry.validateAll();
+
+  assert.equal(writes, 1);
+  assert.equal(result.length, 2);
+  assert.deepEqual(
+    result.map((profile) => profile.state),
+    ['online', 'online'],
+  );
+});
+
 test('rejects a proxy profile shared by two workspaces', (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'wahub-egress-shared-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
